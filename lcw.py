@@ -25,31 +25,6 @@ def base64write(data, f):
         i += 1
         print(i, encoded[j:j+70], file=f, sep='=')
 
-def mapwrite(templates, icons, f=sys.stdout, width=126, height=126):
-    assert(templates.shape == icons.shape)
-    assert(templates.shape == (128, 128))
-    print("[Basic]", file=f)
-    print("NewINIFormat=3", file=f)
-    print("", file=f)
-    print("[Map]", file=f)
-    print("X={}\nY={}\nWidth={}\nHeight={}".format(1,1, width, height), file=f)
-    print("Theater=temperate", file=f)
-    
-    print("", file=f)
-    print("[Waypoints]", file=f)
-    for w in range(8):
-        print("{}={}".format(w, w+129), file=f)
-    print("", file=f)
-    print("[MapPack]", file=f)
-    base64write(LCWpack(bytes(templates[:32].data)) + 
-                LCWpack(bytes(templates[32:64].data)) + 
-                LCWpack(bytes(templates[64:96].data)) + 
-                LCWpack(bytes(templates[96:].data)) + 
-                LCWpack(bytes(icons[:64].data)) + 
-                LCWpack(bytes(icons[64:].data)), f)
-    print("", file=f)
-    print("[OverlayPack]\n1=BwAAIIH//v8f/4AHAAAggf/+/x//gA==", file=f)
-    
 def LCWunpack(Source, Dest):
     SP = 0
     DP = 0

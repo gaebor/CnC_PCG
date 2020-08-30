@@ -2,96 +2,39 @@ from brownian_sheet import *
 import numpy
 from argparse import ArgumentParser
 import sys
-from lcw import mapwrite, MyFormatter
+from lcw import base64write, LCWpack, MyFormatter
+import generate
 
-def generate_by_color(F, G, H, width=20):
-    result = ["<!DOCTYPE html>", "<html>", "<head>"]
-    result.append("<style>")
-    result.append("td {{ text-align: center; vertical-align: middle; width:{0}px; height:{0}px;}}".format(width))
-    result.append("tr {{ height:{0}px;}}".format(width))
-    result.append("</style>")
-    result.append("</head>")
-    result.append("<body>")
-    result.append("<table border=0 cellpadding=0 cellspacing=0 style='border-collapse: collapse; table-layout:fixed;'>")
+def mapwrite(templates, icons, mines=[], f=sys.stdout, width=126, height=126):
+    assert(templates.shape == icons.shape)
+    assert(templates.shape == (128, 128))
+    print("[Basic]", file=f)
+    print("NewINIFormat=3", file=f)
+    print("", file=f)
+    print("[Map]", file=f)
+    print("X={}\nY={}\nWidth={}\nHeight={}".format(1,1, width, height), file=f)
+    print("Theater=temperate", file=f)
     
-    result.append("  <col width={0} style='width={0}px;' span={1}>".format(width, F.shape[1]))
-    for i in range(F.shape[0]):
-        result.append("  <tr>")
-        for j in range(F.shape[1]):
-            color = "rgb({},{},{})".format(F[i,j], G[i,j], H[i,j])
-            result.append(rendertile(i, j, color, width=width))
-        result.append("  </tr>")
-    result.append("</table>")
-    result.append("</body>")
-    result.append("</html>")
-    return '\n'.join(result)
-
-def generate_html(E, width=20, hue=4):
-    result = ["<!DOCTYPE html>", "<html>", "<head>"]
-    result.append("<style>")
-    result.append("td {{ text-align: center; vertical-align: middle; width:{0}px; height:{0}px;}}".format(width))
-    result.append("tr {{ height:{0}px;}}".format(width))
-    result.append("</style>")
-    result.append("</head>")
-    result.append("<body>")
-    result.append("<table border=0 cellpadding=0 cellspacing=0 style='border-collapse: collapse; table-layout:fixed;'>")
+    print("", file=f)
+    print("[Waypoints]", file=f)
+    for w in range(8):
+        print("{}={}".format(w, w+129), file=f)
+    print("", file=f)
     
-    h = (E.shape[0]+1)//2
-    w = (E.shape[1]+1)//2
+    print("[TERRAIN]", file=f)
+    for p in mines:
+        print("{}=MINE".format(p), file=f)
+
+    print("[MapPack]", file=f)
+    base64write(LCWpack(bytes(templates[:32].data)) + 
+                LCWpack(bytes(templates[32:64].data)) + 
+                LCWpack(bytes(templates[64:96].data)) + 
+                LCWpack(bytes(templates[96:].data)) + 
+                LCWpack(bytes(icons[:64].data)) + 
+                LCWpack(bytes(icons[64:].data)), f)
+    print("", file=f)
+    print("[OverlayPack]\n1=BwAAIIH//v8f/4AHAAAggf/+/x//gA==", file=f)
     
-    result.append("  <col width={0} style='width={0}px;' span={1}>".format(width, w))
-    for i in range(h):
-        result.append("  <tr>")
-        for j in range(w):
-            sides = []
-            color = "blue" if E[2*i,2*j]<0 else "hsl({},100%,50%)".format(140-hue*E[2*i,2*j])
-            if i < h-1:
-                if E[2*i+1,2*j] > 0:
-                    sides.append(('bottom', "2px solid brown"))
-            if j < w-1:
-                if E[2*i,2*j+1] > 0:
-                    sides.append(('right', "2px solid brown"))
-            result.append(rendertile(i, j, color, sides, width))
-        result.append("  </tr>")
-    result.append("</table>")
-    result.append("</body>")
-    result.append("</html>")
-    return '\n'.join(result)
- 
-def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
-    result = "<td style='background-color:{}; ".format(color)
-    for s in l:
-        if type(s) == str:
-            result += "border-{}: {};".format(s, "1px solid black")
-        elif len(s) > 1:
-            result += "border-{}: {};".format(*s)
-    result += "'>"
-    # result += "+"
-    # cross=""
-    # if j%2==0:
-        # if i%4==0:
-            # cross = "<path stroke-width={thick} stroke='white' d='M0 {1} l{0} 0 M{1} {1} l0 {1}' /> <path stroke-width={thin} stroke='white' d='M{1} 0 l0 {1}' />"
-        # elif i%4==1:
-            # cross = "<path stroke-width={thin} stroke='white' d='M0 {1} l{0} 0' /> <path stroke-width={thick} stroke='white' d='M{1} 0 l0 {0}' />"
-        # elif i%4==2:
-            # cross = "<path stroke-width={thin} stroke='white' d='M{1} {1} l0 {1}' /> <path stroke-width={thick} stroke='white' d='M0 {1} l{0} 0 M{1} 0 l0 {1}' />"
-        # else:
-            # cross = "<path stroke-width={thin} stroke='white' d='M0 {1} l{0} 0 M{1} 0 l0 {0}' />"
-    # else:
-        # if i%4==0:
-            # cross = "<path stroke-width={thin} stroke='white' d='M{1} {1} l0 {1}' /> <path stroke-width={thick} stroke='white' d='M0 {1} l{0} 0 M{1} 0 l0 {1}' />"
-        # elif i%4==1:
-            # cross = "<path stroke-width={thin} stroke='white' d='M0 {1} l{0} 0 M{1} 0 l0 {0}' />"
-        # elif i%4==2:
-            # cross = "<path stroke-width={thick} stroke='white' d='M0 {1} l{0} 0 M{1} {1} l0 {1}' /> <path stroke-width={thin} stroke='white' d='M{1} 0 l0 {1}' />"
-        # else:
-            # cross = "<path stroke-width={thin} stroke='white' d='M0 {1} l{0} 0' /> <path stroke-width={thick} stroke='white' d='M{1} 0 l0 {0}' />"
-    # result += ("<svg width='{0}' height='{0}'> " + cross + " </svg>").\
-                # format(width-2, (width-2)/2, thin=thinstroke, thick=thickstroke)
-
-    result += "</td>"
-    return result
-
 def to_tiles(M):
     """
     calculates RA1 template and icon enums from edge and cell data
@@ -325,33 +268,13 @@ def to_tiles(M):
     return templates, icons
     
 def main(args):
-    if args.seed >= 0:
-        numpy.random.seed(args.seed)
+    M, templates, icons, resource_positions = generate.main(args, to_tiles)
     
-    if args.type == "brownian":
-        B, X = generate(args.n, args.n, H=args.H)
-    elif args.type == "perlin":
-        B = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-        X = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-    B += args.offset
-    
-    if len(args.rockface) == 1:
-        args.rockface = args.rockface[0]
-    else:
-        args.rockface = sigmoid(args.rockface[0]*X + args.rockface[1])
-        
-    if args.dh < 0:
-        H, _ = generate(args.n, args.n, H=args.H)
-        c = 4
-        args.dh = (31 + (31*(-31 + c))/(31 - c + c*numpy.exp(H))).astype("int32")
-        print(args.dh.max(), file=sys.stderr)
-
-    print(B.min(), B.max(), file=sys.stderr)
-    M = generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
     if args.format == 'html':
-        print(generate_html(M, width=args.width, hue=args.hue))
+        print(generate.html(M, width=args.width, hue=args.hue))
     elif args.format == 'mpr':
-        mapwrite(*to_tiles(M), width=M.shape[1]-1, height=M.shape[0]-1)
+        mapwrite(templates, icons, resource_positions, 
+                 width=M.shape[1]-1, height=M.shape[0]-1)
     return 0
 
 if __name__ == "__main__":
@@ -379,10 +302,11 @@ if __name__ == "__main__":
                         " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
     
     parser.add_argument("-m", "--mine", "--resource", dest="resource", 
-                        type=float, default=[1, 0.1], metavar="param",
-                        nargs=2, help="Sets when to place a resource field/mine.\n"
-                        "if m=sigmoid(a*X+b) then: gold is when 0.25 <= m < 0.5,\n"
-                        "gem is when 0.5 <= m < 0.75 and mine is when m >= 0.75")
+                        type=float, default=[0.005],
+                        nargs='+', help="Sets when to place a resource field/mine.\n"
+                        "If one parameter is given, then mines are placed with uniform probability 'm' (threshold a Poisson noise).\n"
+                        "If two arguments are given, then with probability"
+                        " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
 
     parser.add_argument("-T", "--tree", "--terrain", dest="tree", 
                         type=float, default=[1, 0.1], nargs=2)

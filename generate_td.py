@@ -3,9 +3,9 @@ import numpy
 from argparse import ArgumentParser
 import sys
 from lcw import MyFormatter
-from generate_ra1 import generate_html, rendertile
+import generate
 
-def mapwrite(templates, icons, filename='map', width=62, height=62):
+def mapwrite(templates, icons, tibtrees=[], filename='map', width=62, height=62):
     assert(templates.shape == icons.shape)
     assert(templates.shape == (64, 64))
     
@@ -18,7 +18,12 @@ def mapwrite(templates, icons, filename='map', width=62, height=62):
         print("[Waypoints]", file=f)
         for w in range(6):
             print("{}={}".format(w, w+65), file=f)
-    
+        
+        print("", file=f)
+        print("[Terrain]", file=f)
+        for p in tibtrees:
+            print("{}=split2,None".format(p-64), file=f)
+
     with open(filename + '.bin', 'wb') as f:
         data = numpy.zeros(64*64*2, dtype=numpy.uint8)
         data[0::2] = templates.flatten()
@@ -194,33 +199,13 @@ def to_tiles(M):
     return templates, icons
     
 def main(args):
-    if args.seed >= 0:
-        numpy.random.seed(args.seed)
+    M, templates, icons, resource_positions = generate.main(args, to_tiles)
     
-    if args.type == "brownian":
-        B, X = generate(args.n, args.n, H=args.H)
-    elif args.type == "perlin":
-        B = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-        X = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-    B += args.offset
-    
-    if len(args.rockface) == 1:
-        args.rockface = args.rockface[0]
-    else:
-        args.rockface = sigmoid(args.rockface[0]*X + args.rockface[1])
-        
-    if args.dh < 0:
-        H, _ = generate(args.n, args.n, H=args.H)
-        c = 4
-        args.dh = (31 + (31*(-31 + c))/(31 - c + c*numpy.exp(H))).astype("int32")
-        print(args.dh.max(), file=sys.stderr)
-
-    print(B.min(), B.max(), file=sys.stderr)
-    M = generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
     if args.format == 'html':
-        print(generate_html(M, width=args.width, hue=args.hue))
+        print(generate.html(M, width=args.width, hue=args.hue))
     elif args.format == 'inibin':
-        mapwrite(*to_tiles(M), filename=args.output, width=M.shape[1]-1, height=M.shape[0]-1)
+        mapwrite(templates, icons, resource_positions, 
+                 filename=args.output, width=M.shape[1]-1, height=M.shape[0]-1)
     return 0
 
 if __name__ == "__main__":
@@ -243,7 +228,7 @@ if __name__ == "__main__":
                             "If set to negative then random.")
     parser.add_argument("--dhbase", dest="dhbase", type=float, default=0.125,
                         help="minimum height difference to consider a 'step' in height.")
-    parser.add_argument("-r", "--rock", dest="rockface", type=float, default=[0.1],
+    parser.add_argument("-r", "--rock", dest="rockface", type=float, default=[0.2],
                         metavar='param',
                         nargs='+', help="Sets when to break a rockface.\n"
                         "If one argument is given, then rock is deleted with uniform probability 'r' (threshold a Poisson noise).\n"
@@ -254,8 +239,11 @@ if __name__ == "__main__":
                         help="height offset of map (elevation)")
     
     parser.add_argument("--tiberium", "--resource", dest="resource", 
-                        type=float, default=[1, 0.1], metavar="param",
-                        nargs=2, help="Sets when to place a resource field/tiberium tree.")
+                        type=float, default=[0.005],
+                        nargs='+', help="Sets when to place a tiberium tree.\n"
+                        "If one parameter is given, then with uniform probability (threshold a Poisson noise).\n"
+                        "If two arguments are given, then with probability"
+                        " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
 
     parser.add_argument("-T", "--tree", "--terrain", dest="tree", 
                         type=float, default=[1, 0.1], nargs=2)
