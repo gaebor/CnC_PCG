@@ -5,7 +5,7 @@ import sys
 from lcw import MyFormatter
 import generate
 
-def mapwrite(templates, icons, tibtrees=[], filename='map', width=62, height=62):
+def mapwrite(templates, icons, tibtrees=[], trees=[], filename='map', width=62, height=62):
     assert(templates.shape == icons.shape)
     assert(templates.shape == (64, 64))
     
@@ -23,6 +23,9 @@ def mapwrite(templates, icons, tibtrees=[], filename='map', width=62, height=62)
         print("[Terrain]", file=f)
         for p in tibtrees:
             print("{}=split2,None".format(p-64), file=f)
+        for p in trees:
+            treetype = [1,2,3,5,6,7,12,13,16,17][generate.fixed_random(p, n=10)]
+            print("{}=T{:02d},None".format(p-64, treetype), file=f)
 
     with open(filename + '.bin', 'wb') as f:
         data = numpy.zeros(64*64*2, dtype=numpy.uint8)
@@ -164,19 +167,19 @@ def to_tiles(M):
                     #  |
                     #  |
                     if M[i+1,j-1] > M[i+1,j+1]:
-                        # slope26
-                        template = 38
+                        # slope24-slope26
+                        template = [36, 37, 38][generate.fixed_random(i, j, 3)]
                     else:
-                        # slope12
-                        template = 24
+                        # slope10-slope12
+                        template = [22, 23, 24][generate.fixed_random(i, j, 3)]
                 elif M[i,j-1] != 0 and M[i,j+1] != 0:
                     # _ _
                     if M[i+1,j-1] > M[i-1,j-1]:
-                        # slope17
-                        template = 29
+                        # slope17-slope19
+                        template = [29, 30, 31][generate.fixed_random(i, j, 3)]
                     else:
-                        # slope04
-                        template = 16
+                        # slope03-slope05
+                        template = [15, 16, 17][generate.fixed_random(i, j, 3)]
             elif number_of_adjacent_rocks == 4:
                 if M[i-1,j-1] > M[i-1,j+1]:
                     # +0
@@ -199,13 +202,13 @@ def to_tiles(M):
     return templates, icons
     
 def main(args):
-    M, templates, icons, resource_positions = generate.main(args, to_tiles)
-    
+    values = generate.main(args, to_tiles)
+    M = values[0]
+    values = values[1:]
     if args.format == 'html':
         print(generate.html(M, width=args.width, hue=args.hue))
     elif args.format == 'inibin':
-        mapwrite(templates, icons, resource_positions, 
-                 filename=args.output, width=M.shape[1]-1, height=M.shape[0]-1)
+        mapwrite(*values, filename=args.output, width=M.shape[1]-1, height=M.shape[0]-1)
     return 0
 
 if __name__ == "__main__":
@@ -239,14 +242,14 @@ if __name__ == "__main__":
                         help="height offset of map (elevation)")
     
     parser.add_argument("--tiberium", "--resource", dest="resource", 
-                        type=float, default=[0.005],
+                        type=float, default=[0.1, -4.5],
                         nargs='+', help="Sets when to place a tiberium tree.\n"
                         "If one parameter is given, then with uniform probability (threshold a Poisson noise).\n"
                         "If two arguments are given, then with probability"
                         " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
 
     parser.add_argument("-T", "--tree", "--terrain", dest="tree", 
-                        type=float, default=[1, 0.1], nargs=2)
+                        type=float, default=[0.5, -3], nargs='+')
                        
     parser.add_argument("-t", "--type", dest="type", type=str, default="brownian",
                         choices=["brownian", "perlin"],

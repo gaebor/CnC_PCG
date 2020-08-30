@@ -1,6 +1,14 @@
 from brownian_sheet import *
 import numpy
+from zlib import crc32
+import struct
 
+def fixed_random(x, y=None, n=2):
+    if y is not None:
+        return crc32(struct.pack('BB', x, y)) % n
+    else:
+        return crc32(struct.pack('H', x)) % n
+        
 def by_color(F, G, H, width=20):
     result = ["<!DOCTYPE html>", "<html>", "<head>"]
     result.append("<style>")
@@ -66,6 +74,13 @@ def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
     result += "</td>"
     return result
     
+def make_threshold_mask(th, X):
+    if len(th) == 1:
+        th = th[0]
+    else:
+        th = sigmoid(th[0]*X + th[1])
+    return th
+        
 def main(args, render_f):
     if args.seed >= 0:
         numpy.random.seed(args.seed)
@@ -83,15 +98,9 @@ def main(args, render_f):
     
     B += args.offset
     
-    if len(args.rockface) == 1:
-        args.rockface = args.rockface[0]
-    else:
-        args.rockface = sigmoid(args.rockface[0]*X + args.rockface[1])
-    
-    if len(args.resource) == 1:
-        args.resource = args.resource[0]
-    else:
-        args.resource = sigmoid(args.resource[0]*R1 + args.resource[1])
+    args.rockface = make_threshold_mask(args.rockface, X)
+    args.resource = make_threshold_mask(args.resource, R1)
+    args.tree = make_threshold_mask(args.tree, R2)
     
     if args.dh < 0:
         H, _ = generate(args.n, args.n, H=args.H)
@@ -101,11 +110,21 @@ def main(args, render_f):
     M = generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
     templates, icons = render_f(M)
     
+    # free cells
+    Fmask = numpy.zeros(templates.shape, dtype=bool)
+    Fmask[1:1+final_size,1:1+final_size] = templates[1:1+final_size,1:1+final_size] == numpy.iinfo(templates.dtype).max
+    
     Rmask = numpy.zeros(templates.shape, dtype=bool)
     Rmask[1:1+final_size,1:1+final_size] = numpy.logical_and(
             numpy.random.rand(final_size, final_size) < args.resource,
-            templates[1:1+final_size,1:1+final_size] == numpy.iinfo(templates.dtype).max
+            Fmask[1:1+final_size,1:1+final_size]
             )
     resource_positions = numpy.where(Rmask.flatten())[0]
     
-    return M, templates, icons, resource_positions
+    Rmask[1:1+final_size,1:1+final_size] = numpy.logical_and(
+            numpy.random.rand(final_size, final_size) < args.tree,
+            numpy.logical_and(Fmask[1:1+final_size,1:1+final_size], ~Rmask[1:1+final_size,1:1+final_size])
+            )
+    tree_positions = numpy.where(Rmask.flatten())[0]
+    
+    return M, templates, icons, resource_positions, tree_positions

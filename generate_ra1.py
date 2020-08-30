@@ -5,7 +5,7 @@ import sys
 from lcw import base64write, LCWpack, MyFormatter
 import generate
 
-def mapwrite(templates, icons, mines=[], f=sys.stdout, width=126, height=126):
+def mapwrite(templates, icons, mines=[], trees=[], f=sys.stdout, width=126, height=126):
     assert(templates.shape == icons.shape)
     assert(templates.shape == (128, 128))
     print("[Basic]", file=f)
@@ -24,6 +24,9 @@ def mapwrite(templates, icons, mines=[], f=sys.stdout, width=126, height=126):
     print("[TERRAIN]", file=f)
     for p in mines:
         print("{}=MINE".format(p), file=f)
+    for p in trees:
+        treetype = [1,2,3,5,6,7,12,13,16,17][generate.fixed_random(p, n=10)]
+        print("{}=T{:02d}".format(p-128, treetype), file=f)
 
     print("[MapPack]", file=f)
     base64write(LCWpack(bytes(templates[:32].data)) + 
@@ -268,13 +271,13 @@ def to_tiles(M):
     return templates, icons
     
 def main(args):
-    M, templates, icons, resource_positions = generate.main(args, to_tiles)
-    
+    values = generate.main(args, to_tiles)
+    M = values[0]
+    values = values[1:]
     if args.format == 'html':
         print(generate.html(M, width=args.width, hue=args.hue))
     elif args.format == 'mpr':
-        mapwrite(templates, icons, resource_positions, 
-                 width=M.shape[1]-1, height=M.shape[0]-1)
+        mapwrite(*values, width=M.shape[1]-1, height=M.shape[0]-1)
     return 0
 
 if __name__ == "__main__":
@@ -302,14 +305,14 @@ if __name__ == "__main__":
                         " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
     
     parser.add_argument("-m", "--mine", "--resource", dest="resource", 
-                        type=float, default=[0.005],
+                        type=float, default=[0.1, -4.5],
                         nargs='+', help="Sets when to place a resource field/mine.\n"
                         "If one parameter is given, then mines are placed with uniform probability 'm' (threshold a Poisson noise).\n"
                         "If two arguments are given, then with probability"
                         " 'sigmoid(a*X+b)'\nwhere X is a Brownian noise.")
 
     parser.add_argument("-T", "--tree", "--terrain", dest="tree", 
-                        type=float, default=[1, 0.1], nargs=2)
+                        type=float, default=[0.5, -3], nargs='+')
                        
     parser.add_argument("-t", "--type", dest="type", type=str, default="brownian",
                         choices=["brownian", "perlin"],
