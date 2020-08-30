@@ -93,7 +93,11 @@ def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
     return result
 
 def to_tiles(M):
-    """calculates CnC template and icon enums from edge and cell data"""
+    """
+    calculates RA1 template and icon enums from edge and cell data
+    numbering is according to https://github.com/electronicarts/CnC_Remastered_Collection/blob/master/REDALERT/DEFINES.H
+    TemplateType enum
+    """
     templates = numpy.ones((128,128), dtype=numpy.uint16)*0xFFFF
     icons = numpy.ones((128,128), dtype=numpy.uint8)*0xFF
     
@@ -311,7 +315,7 @@ def to_tiles(M):
                         # watercliff38
                         template = 96
             
-            if template != 0 and template != 65535:
+            if template != 0 and template != 0xFFFF:
                 templates[i:i+2,j:j+2] = template
                 icons[i,j] = 0
                 icons[i,j+1] = 1
