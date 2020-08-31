@@ -1,4 +1,5 @@
 import numpy
+import math
 from numpy import random
 from perlin2d import *
 
@@ -81,14 +82,20 @@ def descent(x, n=3):
 def sigmoid(x):
     return 1/(1+numpy.exp(-x))
 
-def generate_perlin(shape, res=(1,1), octaves=1, H=0.5):
-    noise = numpy.zeros(shape)
+def generate_perlin(shape):
+    n = 2**math.ceil(numpy.log2(max(shape)))
+    octaves = 1 + int(numpy.log2(n))
+    res = (1, 1)
+    noise = np.zeros((n, n))
     frequency = 1
-    for n in range(1, octaves+1):
-        noise += ((1/n)**H)*generate_perlin_noise_2d(shape, (frequency*res[0], frequency*res[0]))
+    amplitude = 1
+    persistence = 0.5
+    for _ in range(octaves):
+        noise += amplitude * generate_perlin_noise_2d((n, n), (frequency*res[0], frequency*res[1]))
         frequency *= 2
-    return noise
-
+        amplitude *= persistence
+    return noise[:shape[0], :shape[1]]
+    
 def fixed_normal(x, size=None):
     random.seed(zlib.crc32(repr(x).encode("utf-8")) & 0xffffffff)
     return random.standard_normal(size)
@@ -138,6 +145,22 @@ def highest_bit(x, dtype='int32'):
     return y
 
 def find_contours(F, dhbase=0.125):
+    """
+    Contour (edge) is formed between two different height cells.
+    The height difference determines the numbering of the contours through a 
+    
+    'f(height1, height2) -> edge number' function.
+    It's the highest 2 power between the height of the lines.
+    
+    between neighboring numbers:
+    0   1   2   3   4   5   6   7   8   9   10
+     \ / \ / \ / \ / \ / \ / \ / \ / \ / \ /
+      1   2   1   3   1   2   1   4   1   2
+    
+    in formula: 'highest_bit(x XOR y)'
+    
+    water is -1 and if a contour meets water then it has higher hierarchy then anything on land.
+    """
     E = numpy.zeros((2*F.shape[0]-1, 2*F.shape[1]-1), 'int32')
     E[::2, ::2] = numpy.maximum(-1, numpy.floor(F/dhbase).astype('int32'))
     
@@ -147,6 +170,31 @@ def find_contours(F, dhbase=0.125):
     return E
 
 def hierarchical_contours(E, minh=0):
+    """
+    Deletes every lower hierarchy contour in the neighborhood of any higher hierarchy contours.
+    From highest hierarchy down to lowest level hierarchy.
+    This ensures that no two different level contours meet
+    (same level contours can meet because they are just level-lines of a surface, therefore consistent*).
+    In case of crossing, the higher level contours is continued and lower level is broken up.
+    
+    The remaining contours should be kept consistent (no T junctions)
+    therefore a higher level contour deletes the lower level contours around itself.
+    
+    TODO: what did I do here? It was the key somehow.
+    You cannot delete any edge, you have to delete a whole cell to keep the remaining part
+    consistent. By that I mean no dangling edges.
+    
+    good:
+     _
+    |_|_
+    |_|_|
+    
+    bad:
+     _
+    |_|_
+    |_|_
+        
+    """
     h = 32
     while h > 0:
         E[ :  :2, 1:-2:2][numpy.logical_and(E[ :  :2, 1:-2:2] < h, E[:  :2, 3:  :2] == h)] = 0

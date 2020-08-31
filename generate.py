@@ -80,7 +80,7 @@ def make_threshold_mask(th, X):
     else:
         th = sigmoid(th[0]*X + th[1])
     return th
-        
+
 def main(args, render_f):
     if args.seed >= 0:
         numpy.random.seed(args.seed)
@@ -91,10 +91,10 @@ def main(args, render_f):
         B, X = generate(args.n, args.n, H=args.H)
         R1, R2 = generate(final_size, final_size, H=args.H)
     elif args.type == "perlin":
-        B = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-        X = generate_perlin((args.n, args.n), (1, 1), 1+int(numpy.log2(args.n)), H=args.H)
-        R1 = generate_perlin((final_size, final_size), (1, 1), 1+int(numpy.log2(final_size)), H=args.H)
-        R2 = generate_perlin((final_size, final_size), (1, 1), 1+int(numpy.log2(final_size)), H=args.H)
+        B = generate_perlin((args.n, args.n))
+        X = generate_perlin((args.n, args.n))
+        R1 = generate_perlin((final_size, final_size))
+        R2 = generate_perlin((final_size, final_size))
     
     B += args.offset
     

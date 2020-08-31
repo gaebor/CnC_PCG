@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from brownian_sheet import *
 import numpy
 from argparse import ArgumentParser
@@ -214,7 +215,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser(formatter_class=MyFormatter,
                         description='Generate a random CnC (TD) map.\n'
-                        'Author: Gabor Borbely (gaebor)\n')
+                        'Author: Gábor Borbély (gaebor)\n')
     parser.add_argument("output", type=str,
                         help="output filename, .ini and .bin files will be generated.")
     

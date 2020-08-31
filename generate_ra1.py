@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from brownian_sheet import *
 import numpy
 from argparse import ArgumentParser
@@ -283,7 +284,7 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser(formatter_class=MyFormatter,
                         description='Generate a random CnC (RA1) map.\n'
-                        'Author: Gabor Borbely (gaebor)\n')
+                        'Author: Gábor Borbély (gaebor)\n')
     parser.add_argument('-n', type=int, default=64, 
                         help="number of rows in the generated map")
     parser.add_argument('-H', type=float, default=0.7, 
