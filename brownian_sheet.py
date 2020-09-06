@@ -16,91 +16,26 @@ import zlib
    " ": face, tile, cell
 """
 
-def linear_estimate(x,y):
-    a, Ba = x
-    b, Bb = y
-    c = (a+b)//2
-    return (c, 0.5 * numpy.linalg.norm(a-b)**0.5 * fixed_normal(c))
-
-def parallel(a,b):
-    return a[0]*b[1] - a[1]*b[0] == 0
-
-def perpendicular(a,b):
-    return a[0]*b[0] + a[1]*b[1] == 0
-    
-def sameside(a,b,c,x):
-    s = b-a
-    s = s[[1,0]]
-    s[1] *= -1
-    v = numpy.array([x-a,c-a]).dot(s)
-    return numpy.sign(v).prod()
-
-def descent(x, n=3):
-    sqrta = 2**(n/2)
-    l = (numpy.array([0,0], dtype='int32'), 
-         numpy.array([2**n,0], dtype='int32'),
-         numpy.array([0,2**n], dtype='int32'))
-    v = (0.0,)
-    v += (sqrta * fixed_normal(l[1]),)
-    v += (0.2928932188134524 * v[1] + 0.9561451575849219 * sqrta * fixed_normal(l[2]),)
-    print(v)
-    result = [l]
-    while len(l) > 1:
-        if any((a==x).all() for a in l):
-            l = (x,)
-        elif len(l) == 2:
-            y = (l[0] + l[1])//2 # TODO calculate
-            if numpy.linalg.norm(l[0]-x) < numpy.linalg.norm(l[1]-x):
-                l = (l[0], y)
-            else:
-                l = (l[1], y)
-        else:
-            a = l[0]
-            b = l[1]
-            c = l[2]
-            if parallel(x-a, b-a):
-                l = (a, b)
-            elif parallel(x-b, c-b):
-                l = (b, c)
-            elif parallel(x-a, c-a):
-                l = (a, c)
-            else:
-                # TODO calculate
-                ab = (a+b)//2
-                ac = (a+c)//2
-                bc = (b+c)//2
-                if sameside(ab, ac, a, x) >= 0:
-                    l = (a, ab, ac)
-                elif sameside(ab, bc, b, x) >= 0:
-                    l = (b, ab, bc)
-                else:
-                    l = (c, ac, bc)
-        result.append(l)
-        print(l)
-    return result
-
 def sigmoid(x):
     return 1/(1+numpy.exp(-x))
 
-def generate_perlin(shape):
-    n = 2**math.ceil(numpy.log2(max(shape)))
+def perlin(shape0, shape1, **kwargs):
+    n = 2**math.ceil(numpy.log2(max(shape0, shape1)))
     octaves = 1 + int(numpy.log2(n))
     res = (1, 1)
-    noise = np.zeros((n, n))
-    frequency = 1
-    amplitude = 1
-    persistence = 0.5
-    for _ in range(octaves):
-        noise += amplitude * generate_perlin_noise_2d((n, n), (frequency*res[0], frequency*res[1]))
-        frequency *= 2
-        amplitude *= persistence
-    return noise[:shape[0], :shape[1]]
-    
-def fixed_normal(x, size=None):
-    random.seed(zlib.crc32(repr(x).encode("utf-8")) & 0xffffffff)
-    return random.standard_normal(size)
+    X = generate_fractal_noise_2d((n, n), res, octaves)[:shape0, :shape1]
+    Y = generate_fractal_noise_2d((n, n), res, octaves)[:shape0, :shape1]
+    return X, Y
 
-def generate(n, m, H=0.5):
+def simple(n, m, H=0.5):
+    """http://paulbourke.net/fractals/noise/"""
+    X = numpy.random.standard_normal(size=(n,m)) + 1j*numpy.random.standard_normal(size=(n,m))
+    r = numpy.sqrt((numpy.linspace(1,n,n)**2)[:, None] + \
+                   (numpy.linspace(1,m,m)**2)[None, :])
+    F = numpy.fft.fft2(X / r**(4*H))
+    return numpy.real(F), numpy.imag(F)
+    
+def brownian(n, m, H=0.5):
     """
     Stochastic Geometry, Spatial Statistics and Random Fields Models and Algorithms,
     Section: Generating Stationary Processes via Circulant Embedding

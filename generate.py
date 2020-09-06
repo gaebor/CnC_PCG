@@ -1,4 +1,4 @@
-from brownian_sheet import *
+import brownian_sheet
 import numpy
 from zlib import crc32
 import struct
@@ -70,15 +70,14 @@ def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
             result += "border-{}: {};".format(s, "1px solid black")
         elif len(s) > 1:
             result += "border-{}: {};".format(*s)
-    result += "'>"
-    result += "</td>"
+    result += "'><b>+</b></td>" if i%2==0 and j%2 == 0 else "'>+</td>"
     return result
     
 def make_threshold_mask(th, X):
     if len(th) == 1:
         th = th[0]
     else:
-        th = sigmoid(th[0]*X + th[1])
+        th = brownian_sheet.sigmoid(th[0]*X + th[1])
     return th
 
 def main(args, render_f):
@@ -87,14 +86,10 @@ def main(args, render_f):
     
     final_size = args.n*2-2
     
-    if args.type == "brownian":
-        B, X = generate(args.n, args.n, H=args.H)
-        R1, R2 = generate(final_size, final_size, H=args.H)
-    elif args.type == "perlin":
-        B = generate_perlin((args.n, args.n))
-        X = generate_perlin((args.n, args.n))
-        R1 = generate_perlin((final_size, final_size))
-        R2 = generate_perlin((final_size, final_size))
+    generator = brownian_sheet.__dict__[args.type]
+                
+    B, X = generator(args.n, args.n, H=args.H)
+    R1, R2 = generator(final_size, final_size, H=args.H)
     
     B += args.offset
     
@@ -102,12 +97,13 @@ def main(args, render_f):
     args.resource = make_threshold_mask(args.resource, R1)
     args.tree = make_threshold_mask(args.tree, R2)
     
-    if args.dh < 0:
-        H, _ = generate(args.n, args.n, H=args.H)
-        c = 4
-        args.dh = (31 + (31*(-31 + c))/(31 - c + c*numpy.exp(H))).astype("int32")
+    if len(args.dh) > 1:
+        H, _ = generator(args.n, args.n, H=args.H)
+        args.dh = (32*make_threshold_mask(args.dh, H)).astype('int32')
+    else:
+        args.dh = int(args.dh[0])
 
-    M = generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
+    M = brownian_sheet.generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
     templates, icons = render_f(M)
     
     # free cells
