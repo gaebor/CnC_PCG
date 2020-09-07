@@ -34,6 +34,13 @@ def mapwrite(templates, icons, tibtrees=[], trees=[], filename='map', width=62, 
         data[1::2] = icons.flatten()
         f.write(bytes(data.data))
         
+def match_mask(A, M):
+    '''
+    Checks if A is zero where M is negative and A is non-zero where M is positive.
+    It doesn't matter what A is where M == 0
+    '''
+    return numpy.array_equiv(A[M < 0], 0) and numpy.all(A[M > 0] != 0)
+    
 def to_tiles(M):
     """
     calculates TD template and icon enums from edge and cell data
@@ -43,7 +50,6 @@ def to_tiles(M):
     templates = numpy.ones((64,64), dtype=numpy.uint8)*0xFF
     icons = numpy.ones((64,64), dtype=numpy.uint8)*0xFF
     
-    # TODO remove water elements and renumber according to 
     for i in range(1, M.shape[0], 2):
         for j in range(1, M.shape[1], 2):
             number_of_adjacent_rocks = 0
@@ -195,19 +201,191 @@ def to_tiles(M):
             
             if template != 0 and template != 0xFF:
                 templates[i:i+2,j:j+2] = template
-                icons[i,j] = 0
-                icons[i,j+1] = 1
-                icons[i+1,j] = 2
-                icons[i+1,j+1] = 3
+                icons[i:i+2,j:j+2] = numpy.array([[0,1],[2,3]])
 
+    # special cases
+    # _
+    #  |__
+    
+    for i in range(1, 4*(M.shape[0]//4)+1, 4):
+        for j in range(1, 4*(M.shape[1]//4)+1, 4):
+            if match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0, -1,  0],
+                                                    [ 1,  0, -1,  0, -1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [-1,  0,  1,  0,  1],
+                                                    [ 0, -1,  0, -1,  0],
+                                                ])) or \
+               match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0, -1,  0],
+                                                    [ 1,  0,  1,  0, -1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [-1,  0, -1,  0,  1],
+                                                    [ 0, -1,  0, -1,  0],
+                                                ])):
+                # clear that part
+                templates[i:i+4,j:j+4] = 0xFF
+                icons[i:i+4,j:j+4] = 0xFF
+                
+                if M[i-1, j-1] > M[i+1, j-1]:
+                    # slope02
+                    templates[i:i+3,j:j+2] = 14
+                    icons[i:i+3,j:j+2] = numpy.array([[0,1],[2,3],[4,5]])
+                    templates[i+1:i+4,j+2:j+4] = 14
+                    icons[i+1:i+4,j+2:j+4] = numpy.array([[0,1],[2,3],[4,5]])
+                else:
+                    # slope16
+                    templates[i,j] = 28
+                    templates[i+1,j] = 28
+                    templates[i+1,j+1] = 28
+                    templates[i+2,j+1] = 28
+                    icons[i,j] = 0
+                    icons[i+1,j] = 2
+                    icons[i+1,j+1] = 3
+                    icons[i+2,j+1] = 5
+                    
+                    templates[i+1,j+2] = 28
+                    templates[i+2,j+2] = 28
+                    templates[i+2,j+3] = 28
+                    templates[i+3,j+3] = 28
+                    icons[i+1,j+2] = 0
+                    icons[i+2,j+2] = 2
+                    icons[i+2,j+3] = 3
+                    icons[i+3,j+3] = 5
+            elif match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0, -1,  0],
+                                                    [-1,  0,  1,  0,  1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [ 1,  0, -1,  0, -1],
+                                                    [ 0, -1,  0, -1,  0],
+                                                ])) or \
+                 match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0, -1,  0],
+                                                    [-1,  0, -1,  0,  1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [ 1,  0,  1,  0, -1],
+                                                    [ 0, -1,  0, -1,  0],
+                                                ])):
+                # clear that part
+                templates[i:i+4,j:j+4] = 0xFF
+                icons[i:i+4,j:j+4] = 0xFF
+                if M[i+1, j-1] > M[i+3, j-1]:
+                    # slope06
+                    templates[i+1,j] = 18
+                    templates[i+1,j+1] = 18
+                    templates[i+2,j] = 18
+                    templates[i+2,j+1] = 18
+                    templates[i+3,j] = 18
+                    icons[i+1,j] = 0
+                    icons[i+1,j+1] = 1
+                    icons[i+2,j] = 2
+                    icons[i+2,j+1] = 3
+                    icons[i+3,j] = 4
+                    
+                    templates[i,j+2] = 18
+                    templates[i,j+3] = 18
+                    templates[i+1,j+2] = 18
+                    templates[i+1,j+3] = 18
+                    templates[i+2,j+2] = 18
+                    icons[i,j+2] = 0
+                    icons[i,j+3] = 1
+                    icons[i+1,j+2] = 2
+                    icons[i+1,j+3] = 3
+                    icons[i+2,j+2] = 4
+                else:
+                    # slope20
+                    templates[i+1,j+1] = 32
+                    templates[i+2,j] = 32
+                    templates[i+2,j+1] = 32
+                    templates[i+3,j] = 32
+                    templates[i+3,j+1] = 32
+                    icons[i+1,j+1] = 1
+                    icons[i+2,j] = 2
+                    icons[i+2,j+1] = 3
+                    icons[i+3,j] = 4
+                    icons[i+3,j+1] = 5
+                    
+                    templates[i,j+3] = 32
+                    templates[i+1,j+2] = 32
+                    templates[i+1,j+3] = 32
+                    templates[i+2,j+2] = 32
+                    templates[i+2,j+3] = 32
+                    icons[i,j+3] = 1
+                    icons[i+1,j+2] = 2
+                    icons[i+1,j+3] = 3
+                    icons[i+2,j+2] = 4
+                    icons[i+2,j+3] = 5
+            elif match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [-1,  0,  1,  0, -1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [-1,  0, -1,  0, -1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                ])) or \
+                 match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [-1,  0, -1,  0, -1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [-1,  0,  1,  0, -1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                ])):
+                # clear that part
+                templates[i:i+4,j:j+4] = 0xFF
+                icons[i:i+4,j:j+4] = 0xFF
+                if M[i-1, j-1] > M[i-1, j+1]:
+                    # slope27
+                    templates[i:i+2,j:j+3] = 39
+                    icons[i:i+2,j:j+3] = numpy.array([[0,1,2],[3,4,5]])
+                    templates[i+2:i+4,j+1:j+4] = 39
+                    icons[i+2:i+4,j+1:j+4] = numpy.array([[0,1,2],[3,4,5]])
+                else:
+                    # slope09
+                    templates[i:i+2,j:j+3] = 21
+                    icons[i:i+2,j:j+3] = numpy.array([[0,1,2],[3,4,5]])
+                    templates[i+2:i+4,j+1:j+4] = 21
+                    icons[i+2:i+4,j+1:j+4] = numpy.array([[0,1,2],[3,4,5]])
+            elif match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [-1,  0,  1,  0, -1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                    [-1,  0, -1,  0, -1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                ])) or \
+                 match_mask(M[i-1:i+4, j-1:j+4], numpy.array([
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [-1,  0, -1,  0, -1],
+                                                    [ 0, -1,  0,  1,  0],
+                                                    [-1,  0,  1,  0, -1],
+                                                    [ 0,  1,  0, -1,  0],
+                                                ])):
+                # clear that part
+                templates[i:i+4,j:j+4] = 0xFF
+                icons[i:i+4,j:j+4] = 0xFF
+                if M[i-1, j+1] > M[i-1, j+3]:
+                    # slope23
+                    templates[i:i+2,j+1:j+4] = 35
+                    icons[i:i+2,j+1:j+4] = numpy.array([[0,1,2],[3,4,5]])
+                    templates[i+2:i+4,j:j+3] = 35
+                    icons[i+2:i+4,j:j+3] = numpy.array([[0,1,2],[3,4,5]])
+                else:
+                    # slope13
+                    templates[i:i+2,j+1:j+4] = 25
+                    icons[i:i+2,j+1:j+4] = numpy.array([[0,1,2],[3,4,5]])
+                    templates[i+2:i+4,j:j+3] = 25
+                    icons[i+2:i+4,j:j+3] = numpy.array([[0,1,2],[3,4,5]])
     return templates, icons
     
 def main(args):
     values = generate.main(args, to_tiles)
     M = values[0]
     values = values[1:]
-    if args.format == 'html':
-        print(generate.html(M, width=args.width, hue=args.hue))
+    
+    if args.format == 'html':    
+        if args.output == '':
+            outf = sys.stdout
+        else:
+            outf = open(args.output + '.html', "w")
+        print(generate.html(M, width=args.width, hue=args.hue), file=outf)
     elif args.format == 'inibin':
         mapwrite(*values, filename=args.output, width=M.shape[1]-1, height=M.shape[0]-1)
     return 0
@@ -234,7 +412,7 @@ if __name__ == "__main__":
                             "where X is a random noise.")
     parser.add_argument("--dhbase", dest="dhbase", type=float, default=0.05,
                         help="minimum height difference to consider a 'step' in height.")
-    parser.add_argument("-r", "--rock", dest="rockface", type=float, default=[0.1],
+    parser.add_argument("-r", "--rock", dest="rockface", type=float, default=[0.2],
                         metavar='param',
                         nargs='+', help="Sets when to break a rockface.\n"
                         "If one argument is given, then rock is deleted with uniform probability 'r' (threshold a Poisson noise).\n"
@@ -242,7 +420,7 @@ if __name__ == "__main__":
                         " 'sigmoid(a*X+b)'\nwhere X is a random noise.")
     
     parser.add_argument("--tiberium", "--resource", dest="resource", 
-                        type=float, default=[1, -5.5],
+                        type=float, default=[1, -5],
                         nargs='+', help="Sets when to place a tiberium tree.\n"
                         "If one parameter is given, then with uniform probability (threshold a Poisson noise).\n"
                         "If two arguments are given, then with probability"
