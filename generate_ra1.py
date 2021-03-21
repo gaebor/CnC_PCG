@@ -215,34 +215,34 @@ def to_tiles(M):
                     #  |
                     if M[i + 1, j - 1] > M[i + 1, j + 1]:
                         if M[i + 1, j + 1] >= 0:
-                            # slope26
-                            template = 160
+                            # slope24-slope26
+                            template = [158, 159, 160][generate.fixed_random(i, j, 3)]
                         else:
-                            # watercliff26
-                            template = 84
+                            # watercliff24-26
+                            template = [82, 83, 84][generate.fixed_random(i, j, 3)]
                     else:
                         if M[i + 1, j - 1] >= 0:
-                            # slope12
-                            template = 146
+                            # slope10-12
+                            template = [144, 145, 146][generate.fixed_random(i, j, 3)]
                         else:
-                            # watercliff12
-                            template = 70
+                            # watercliff10-12
+                            template = [68, 69, 70][generate.fixed_random(i, j, 3)]
                 elif M[i, j - 1] != 0 and M[i, j + 1] != 0:
                     # _ _
                     if M[i + 1, j - 1] > M[i - 1, j - 1]:
                         if M[i - 1, j - 1] >= 0:
-                            # slope17
-                            template = 151
+                            # slope17-19
+                            template = [151, 152, 153][generate.fixed_random(i, j, 3)]
                         else:
-                            # watercliff17
-                            template = 75
+                            # watercliff17-19
+                            template = [75, 76, 77][generate.fixed_random(i, j, 3)]
                     else:
                         if M[i + 1, j - 1] >= 0:
-                            # slope04
-                            template = 138
+                            # slope03-05
+                            template = [137, 138, 139][generate.fixed_random(i, j, 3)]
                         else:
-                            # watercliff04
-                            template = 62
+                            # watercliff03-05
+                            template = [61, 62, 63][generate.fixed_random(i, j, 3)]
             elif number_of_adjacent_rocks == 4:
                 if M[i - 1, j - 1] > M[i - 1, j + 1]:
                     if M[i - 1, j + 1] >= 0:
