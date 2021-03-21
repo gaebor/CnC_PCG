@@ -116,7 +116,7 @@ def main(args, render_f):
 
     final_size = args.n * 2 - 2
 
-    generator = brownian_sheet.__dict__[args.type]
+    generator = getattr(brownian_sheet, args.type)
 
     B, X = generator(args.n, args.n, H=args.H)
     R1, R2 = generator(final_size, final_size, H=args.H)

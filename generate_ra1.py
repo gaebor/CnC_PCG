@@ -637,14 +637,25 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser(
         formatter_class=MyFormatter,
-        description='Generate a random CnC (RA1) map.\n' 'Author: Gábor Borbély (gaebor)\n',
+        description="""
+Generate a random CnC (RA1) map.
+Author: Gábor Borbély (gaebor)
+
+If a parameter is called 'random parameter' then it means that it can modify the density of said feature.
+Such a parameter can have one or two values.
+ * If one value ('a') is specified then it acts as a threshold of a uniform Poisson noise:
+    f(x) = rand() < a
+ * If two values are specified ('a' and 'b') then the noise can have a non-uniform distribution.
+    f(x) = rand() < sigmoid(a*B(x)+b)
+   where B is a Brownian noise.
+""",
     )
     parser.add_argument(
         'output', type=str, default="", nargs='?', help="output map filename (without extension)"
     )
 
     parser.add_argument('-n', type=int, default=64, help="number of rows in the generated map")
-    parser.add_argument('-H', type=float, default=0.7, help="Hurst parameter (alpha/2)")
+    parser.add_argument('-H', type=float, default=0.85, help="Hurst parameter (alpha/2)")
     parser.add_argument(
         '-w',
         "--width",
@@ -667,10 +678,9 @@ if __name__ == "__main__":
         type=float,
         nargs='+',
         default=[3],
-        help="minimum height difference between contour lines: dhbase*2^dh.\n"
+        help="'random parameter'\nminimum height difference between contour lines: dhbase*2^dh.\n"
         "If one parameter is given then it should be a non-negative integer.\n"
-        "If two parameters are given then floor(32*sigmoid(a*X+b)) is used\n"
-        "where X is a random noise.",
+        "If two parameters are given then dh(x)=floor(32*sigmoid(a*B(x)+b))",
     )
     parser.add_argument(
         "--dhbase",
@@ -684,15 +694,11 @@ if __name__ == "__main__":
         "--rock",
         dest="rockface",
         type=float,
-        default=[0.1],
+        default=[0.2],
         metavar='param',
         nargs='+',
-        help="Sets when to break a rockface.\n"
-        "If one argument is given, then rock is deleted with uniform probability 'r' (threshold a Poisson noise).\n"
-        "If two arguments are given, then a rock is deleted with probability"
-        " 'sigmoid(a*X+b)'\nwhere X is a random noise.",
+        help="'random parameter'\nDelete from an otherwise continuous cliff.",
     )
-
     parser.add_argument(
         "-m",
         "--mine",
@@ -701,10 +707,7 @@ if __name__ == "__main__":
         type=float,
         default=[1, -6],
         nargs='+',
-        help="Sets when to place a resource field/mine.\n"
-        "If one parameter is given, then mines are placed with uniform probability 'm' (threshold a Poisson noise).\n"
-        "If two arguments are given, then with probability"
-        " 'sigmoid(a*X+b)'\nwhere X is a random noise.",
+        help="'random parameter'\nwhen to place a resource field/mine",
     )
 
     parser.add_argument(
@@ -713,9 +716,9 @@ if __name__ == "__main__":
         "--terrain",
         dest="tree",
         type=float,
-        default=[1, -6],
+        default=[1, -5],
         nargs='+',
-        help='When to place trees.',
+        help="'random parameter'\nWhen to place trees.",
     )
 
     parser.add_argument(
