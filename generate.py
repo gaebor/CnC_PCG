@@ -4,6 +4,60 @@ from zlib import crc32
 import struct
 
 
+def match_mask2(map, pattern):
+    return (
+        numpy.array_equiv(map[pattern == 0], 0)  # 0: should be 0
+        and numpy.all(map[pattern == 1] != 0)  # 1: must containg something
+        and numpy.all(map[pattern >= 2] >= 0)  # 2 or above: land (i.e. 0 or positive)
+        and numpy.all(map[pattern < 0] < 0)  # negative: water
+        and numpy.all(map[pattern == 3] < map[pattern == 4])  # 3 should be lower than 4
+    )
+
+
+def prepend_dim(x):
+    return x.reshape(1, *x.shape)
+
+
+def prepare_formation(pattern, template, icon=None, template_map=None):
+    pattern = numpy.array(pattern)
+    template = numpy.array(template)
+    if template_map is not None and template.dtype.type == numpy.dtype(str):
+        template = numpy.vectorize(template_map.get)(template)
+
+    if pattern.ndim == 2:
+        pattern == prepend_dim(pattern)
+
+    shape = pattern.shape[0] - 1, pattern.shape[1] - 1
+
+    if template.ndim < 2:
+        if template.ndim == 0:
+            template = template.reshape(1)
+
+        ones_of_shape = numpy.ones(shape, dtype=pattern.dtype)
+        arange_of_shape = numpy.arange(shape[0] * shape[1]).reshape(shape)
+
+        template = template[:, None, None] * ones_of_shape[None, :, :]
+        icon = numpy.ones_like(template) * arange_of_shape
+    else:
+        icon = numpy.array(icon)
+        if template.ndim == 2:
+            template = prepend_dim(template)
+            icon = prepend_dim(icon)
+    return template, icon
+
+
+# def check_formation(patterns, roi):
+#     for pattern in patterns:
+#         if match_mask(roi, pattern):
+#             return True
+#     return False
+
+
+# def get_templates_and_icons(self, pseudo_random_choice=0):
+#     i = pseudo_random_choice % templates.shape[0]
+#     return (self.templates[i], self.icons[i])
+
+
 def match_mask(A, M):
     '''
     Checks if A is zero where M is negative and A is non-zero where M is positive.
