@@ -11,13 +11,12 @@ import brownian_sheet
 
 def match_pattern(pattern, map):
     return (
-        numpy.array_equiv(map[pattern == 0], 0)  # 0: should be 0
-        and numpy.all(map[pattern == 1] != 0)  # 1: must containg something
-        and numpy.all(
-            map[(pattern >= 2) & (pattern <= 4)] >= 0
-        )  # 2, 3 or 4: land (i.e. 0 or positive)
-        and numpy.all(map[pattern < 0] < 0)  # negative: water
-        and numpy.all(map[pattern == 3] < map[pattern == 4])  # 3 should be lower than 4
+        (map[pattern == 0] == 0).all()  # 0: should be 0
+        and (map[pattern == 1] != 0).all()  # 1: must containg something
+        and (map[(pattern >= 2) & (pattern <= 4)] >= 0).all()
+        # 2, 3 or 4: land (i.e. 0 or positive)
+        and (map[pattern < 0] < 0).all()  # negative: water
+        and (map[pattern == 3] < map[pattern == 4]).all()  # 3 should be lower than 4
     )
 
 
@@ -66,13 +65,6 @@ def prepare_formation(pattern, template, icon=None, template_map=None):
             template = prepend_dim(template)
             icon = prepend_dim(icon)
     return pattern, template, icon
-
-
-# def check_formation(patterns, roi):
-#     for pattern in patterns:
-#         if match_mask(roi, pattern):
-#             return True
-#     return False
 
 
 def get_pseudo_random_choice(templates, icons, pseudo_random_seed=0):
