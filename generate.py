@@ -179,8 +179,11 @@ def make_threshold_mask(th, X):
 
 
 def main(args, render_f):
-    if args.seed >= 0:
-        numpy.random.seed(args.seed)
+    if args.seed < 0:
+        args.seed = crc32(struct.pack('d', time.time()))
+    print(args.seed, file=sys.stderr)
+
+    numpy.random.seed(args.seed)
 
     final_size = args.n * 2 - 2
 
