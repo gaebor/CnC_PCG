@@ -1,5 +1,6 @@
 from zlib import crc32
 import struct
+import json
 
 import numpy
 
@@ -20,6 +21,17 @@ def prepend_dim(x):
     return x.reshape(1, *x.shape)
 
 
+def import_tiles_file(filename):
+    with open(filename, 'rt') as f:
+        tiles_spec = json.load(f)
+        template_map = {name: i for i, name in enumerate(tiles_spec['template_list'])}
+        template_map['NONE'] = tiles_spec['template_none']
+        return [
+            prepare_formation(template_map=template_map, **pattern)
+            for pattern in tiles_spec['patterns']
+        ]
+
+
 def prepare_formation(pattern, template, icon=None, template_map=None):
     pattern = numpy.array(pattern)
     template = numpy.array(template)
@@ -27,9 +39,9 @@ def prepare_formation(pattern, template, icon=None, template_map=None):
         template = numpy.vectorize(template_map.__getitem__)(template)
 
     if pattern.ndim == 2:
-        pattern == prepend_dim(pattern)
+        pattern = prepend_dim(pattern)
 
-    shape = pattern.shape[0] - 1, pattern.shape[1] - 1
+    shape = pattern.shape[1] - 1, pattern.shape[2] - 1
 
     if template.ndim < 2:
         if template.ndim == 0:
@@ -45,7 +57,7 @@ def prepare_formation(pattern, template, icon=None, template_map=None):
         if template.ndim == 2:
             template = prepend_dim(template)
             icon = prepend_dim(icon)
-    return template, icon
+    return pattern, template, icon
 
 
 # def check_formation(patterns, roi):
