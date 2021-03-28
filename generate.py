@@ -1,17 +1,21 @@
 from zlib import crc32
 import struct
 import json
+import time
+import sys
 
 import numpy
 
 import brownian_sheet
 
 
-def match_mask2(map, pattern):
+def match_pattern(pattern, map):
     return (
         numpy.array_equiv(map[pattern == 0], 0)  # 0: should be 0
         and numpy.all(map[pattern == 1] != 0)  # 1: must containg something
-        and numpy.all(map[pattern >= 2] >= 0)  # 2 or above: land (i.e. 0 or positive)
+        and numpy.all(
+            map[(pattern >= 2) & (pattern <= 4)] >= 0
+        )  # 2, 3 or 4: land (i.e. 0 or positive)
         and numpy.all(map[pattern < 0] < 0)  # negative: water
         and numpy.all(map[pattern == 3] < map[pattern == 4])  # 3 should be lower than 4
     )
@@ -24,8 +28,12 @@ def prepend_dim(x):
 def import_tiles_file(filename):
     with open(filename, 'rt') as f:
         tiles_spec = json.load(f)
-        template_map = {name: i for i, name in enumerate(tiles_spec['template_list'])}
-        template_map['NONE'] = tiles_spec['template_none']
+        if 'template_list' in tiles_spec:
+            template_map = {name: i for i, name in enumerate(tiles_spec['template_list'])}
+            template_map['NONE'] = tiles_spec['template_none']
+        else:
+            template_map = None
+
         return [
             prepare_formation(template_map=template_map, **pattern)
             for pattern in tiles_spec['patterns']
@@ -67,24 +75,16 @@ def prepare_formation(pattern, template, icon=None, template_map=None):
 #     return False
 
 
-# def get_templates_and_icons(self, pseudo_random_choice=0):
-#     i = pseudo_random_choice % templates.shape[0]
-#     return (self.templates[i], self.icons[i])
+def get_pseudo_random_choice(templates, icons, pseudo_random_seed=0):
+    i = pseudo_random_seed % templates.shape[0]
+    return templates[i], icons[i]
 
 
-def match_mask(A, M):
-    '''
-    Checks if A is zero where M is negative and A is non-zero where M is positive.
-    It doesn't matter what A is where M == 0
-    '''
-    return numpy.array_equiv(A[M < 0], 0) and numpy.all(A[M > 0] != 0)
-
-
-def fixed_random(x, y=None, n=2):
+def fixed_random(x, y=None):
     if y is not None:
-        return crc32(struct.pack('BB', x, y)) % n
+        return crc32(struct.pack('BB', x, y))
     else:
-        return crc32(struct.pack('H', x)) % n
+        return crc32(struct.pack('H', x))
 
 
 def by_color(F, G, H, width=20):

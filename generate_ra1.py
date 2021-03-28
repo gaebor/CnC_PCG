@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-from brownian_sheet import *
-import numpy
 from argparse import ArgumentParser
 import sys
+from functools import partial as bind
+
+import numpy
+
+from brownian_sheet import *
 from lcw import base64write, LCWpack, MyFormatter
 import generate
 
@@ -27,7 +30,7 @@ def mapwrite(templates, icons, mines=[], trees=[], f=sys.stdout, width=126, heig
     for p in mines:
         print("{}=MINE".format(p), file=f)
     for p in trees:
-        treetype = [1, 2, 3, 5, 6, 7, 12, 13, 16, 17][generate.fixed_random(p, n=10)]
+        treetype = [1, 2, 3, 5, 6, 7, 12, 13, 16, 17][generate.fixed_random(p) % 10]
         print("{}=T{:02d}".format(p - 128, treetype), file=f)
 
     print("[MapPack]", file=f)
@@ -44,577 +47,75 @@ def mapwrite(templates, icons, mines=[], trees=[], f=sys.stdout, width=126, heig
     print("[OverlayPack]\n1=BwAAIIH//v8f/4AHAAAggf/+/x//gA==", file=f)
 
 
+tile_patterns = generate.import_tiles_file('ra1_tiles.json')
+
+
 def to_tiles(M):
     """
     calculates RA1 template and icon enums from edge and cell data
-    numbering is according to https://github.com/electronicarts/CnC_Remastered_Collection/blob/master/REDALERT/DEFINES.H
-    TemplateType enum
     """
     templates = numpy.ones((128, 128), dtype=numpy.uint16) * 0xFFFF
     icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
 
-    for i in range(1, M.shape[0], 2):
-        for j in range(1, M.shape[1], 2):
-            number_of_adjacent_rocks = 0
-            if M[i - 1, j] != 0:
-                number_of_adjacent_rocks += 1
-            if M[i + 1, j] != 0:
-                number_of_adjacent_rocks += 1
-            if M[i, j - 1] != 0:
-                number_of_adjacent_rocks += 1
-            if M[i, j + 1] != 0:
-                number_of_adjacent_rocks += 1
+    for i in range(1, M.shape[0] - 1, 2):
+        for j in range(1, M.shape[1] - 1, 2):
+            target_slice = (slice(i, i + 2), slice(j, j + 2))
+            match = bind(generate.match_pattern, map=M[i - 1 : i + 2, j - 1 : j + 2])
+            pseudo_random_seed = generate.fixed_random(i, j)
 
-            template = 0xFFFF
+            for patterns, templates_replace, icons_replace in tile_patterns:
+                if patterns.shape[1:] == (3, 3) and templates_replace.shape[1:] == (2, 2):
+                    if any(match(pattern) for pattern in patterns):
+                        new_templates, new_icons = generate.get_pseudo_random_choice(
+                            templates_replace, icons_replace, pseudo_random_seed
+                        )
+                        templates[target_slice] = new_templates
+                        icons[target_slice] = new_icons
+                        break
 
-            if number_of_adjacent_rocks == 0:
-                if M[i - 1, j - 1] < 0:
-                    # water2
-                    template = 2
-            elif number_of_adjacent_rocks == 1:
-                # in this case there cannot be water
-                if M[i + 1, j] != 0:
-                    if M[i + 1, j - 1] > M[i + 1, j + 1]:
-                        # 0 0
-                        # +|-
-                        # slope22, and a bit of padding
-                        templates[i + 1, j] = 156
-                        templates[i + 1, j + 1] = 156
-
-                        icons[i + 1, j] = 0
-                        icons[i + 1, j + 1] = 1
-                    else:
-                        # 0 0
-                        # -|+
-                        # slope08
-                        template = 142
-                elif M[i - 1, j] != 0:
-                    if M[i - 1, j - 1] > M[i - 1, j + 1]:
-                        # +|-
-                        # 0 0
-                        # slope150
-                        templates[i, j] = 162
-                        templates[i, j + 1] = 162
-                        templates[i + 1, j + 1] = 162
-
-                        icons[i, j] = 0
-                        icons[i, j + 1] = 1
-                        icons[i + 1, j + 1] = 3
-                    else:
-                        # -|+
-                        # 0 0
-                        # slope14
-                        templates[i, j] = 148
-                        templates[i, j + 1] = 148
-                        templates[i + 1, j] = 148
-
-                        icons[i, j] = 0
-                        icons[i, j + 1] = 1
-                        icons[i + 1, j] = 2
-                elif M[i, j - 1] != 0:
-                    if M[i - 1, j - 1] > M[i + 1, j - 1]:
-                        # +_0
-                        # - 0
-                        # slope07
-                        template = 141
-                    else:
-                        # -_0
-                        # + 0
-                        # slope21 bit with padding
-                        templates[i, j] = 155
-                        templates[i + 1, j] = 155
-
-                        icons[i, j] = 0
-                        icons[i + 1, j] = 1
-                elif M[i, j + 1] != 0:
-                    if M[i - 1, j + 1] > M[i + 1, j + 1]:
-                        # 0_+
-                        # 0 -
-                        # slope01
-                        template = 135
-                    else:
-                        # 0_-
-                        # 0 +
-                        # slope15
-                        template = 149
-            elif number_of_adjacent_rocks == 2:
-                if M[i, j - 1] != 0 and M[i - 1, j] != 0:
-                    # _|
-                    if M[i - 1, j - 1] > M[i + 1, j - 1]:
-                        if M[i + 1, j - 1] >= 0:
-                            # slope32
-                            templates[i, j] = 166
-                            templates[i, j + 1] = 166
-                            templates[i + 1, j] = 166
-
-                            icons[i, j] = 0
-                            icons[i, j + 1] = 1
-                            icons[i + 1, j] = 2
-                        else:
-                            # watercliff32
-                            template = 90
-                    else:
-                        if M[i - 1, j - 1] >= 0:
-                            # slope36
-                            template = 170
-                        else:
-                            # watercliff36
-                            template = 94
-                elif M[i - 1, j] != 0 and M[i, j + 1] != 0:
-                    # |_
-                    if M[i - 1, j + 1] > M[i - 1, j - 1]:
-                        if M[i - 1, j - 1] >= 0:
-                            # slope29
-                            template = 163
-                        else:
-                            # watercliff29
-                            template = 87
-                    else:
-                        if M[i - 1, j + 1] >= 0:
-                            # slope33
-                            template = 167
-                        else:
-                            # watercliff33
-                            template = 91
-                elif M[i, j + 1] != 0 and M[i + 1, j] != 0:
-                    #  _
-                    # |
-                    if M[i + 1, j + 1] > M[i + 1, j - 1]:
-                        if M[i + 1, j - 1] >= 0:
-                            # slope30
-                            template = 164
-                        else:
-                            # watercliff30
-                            template = 88
-                    else:
-                        if M[i + 1, j + 1] >= 0:
-                            # slope34
-                            template = 168
-                        else:
-                            # watercliff34
-                            template = 92
-                elif M[i + 1, j] != 0 and M[i, j - 1] != 0:
-                    # _
-                    #  |
-                    if M[i + 1, j - 1] > M[i - 1, j - 1]:
-                        if M[i - 1, j - 1] >= 0:
-                            # slope31
-                            template = 165
-                        else:
-                            # watercliff31
-                            template = 89
-                    else:
-                        if M[i + 1, j - 1] >= 0:
-                            # slope35
-                            template = 169
-                        else:
-                            # watercliff35
-                            template = 93
-                elif M[i + 1, j] != 0 and M[i - 1, j] != 0:
-                    #  |
-                    #  |
-                    if M[i + 1, j - 1] > M[i + 1, j + 1]:
-                        if M[i + 1, j + 1] >= 0:
-                            # slope24-slope26
-                            template = [158, 159, 160][generate.fixed_random(i, j, 3)]
-                        else:
-                            # watercliff24-26
-                            template = [82, 83, 84][generate.fixed_random(i, j, 3)]
-                    else:
-                        if M[i + 1, j - 1] >= 0:
-                            # slope10-12
-                            template = [144, 145, 146][generate.fixed_random(i, j, 3)]
-                        else:
-                            # watercliff10-12
-                            template = [68, 69, 70][generate.fixed_random(i, j, 3)]
-                elif M[i, j - 1] != 0 and M[i, j + 1] != 0:
-                    # _ _
-                    if M[i + 1, j - 1] > M[i - 1, j - 1]:
-                        if M[i - 1, j - 1] >= 0:
-                            # slope17-19
-                            template = [151, 152, 153][generate.fixed_random(i, j, 3)]
-                        else:
-                            # watercliff17-19
-                            template = [75, 76, 77][generate.fixed_random(i, j, 3)]
-                    else:
-                        if M[i + 1, j - 1] >= 0:
-                            # slope03-05
-                            template = [137, 138, 139][generate.fixed_random(i, j, 3)]
-                        else:
-                            # watercliff03-05
-                            template = [61, 62, 63][generate.fixed_random(i, j, 3)]
-            elif number_of_adjacent_rocks == 4:
-                if M[i - 1, j - 1] > M[i - 1, j + 1]:
-                    if M[i - 1, j + 1] >= 0:
-                        # +0
-                        # 0+
-                        # slope37
-                        template = 171
-                    else:
-                        # +-
-                        # -+
-                        # watercliff37
-                        template = 95
-                else:
-                    if M[i - 1, j - 1] >= 0:
-                        # 0+
-                        # +0
-                        # slope38
-                        template = 172
-                    else:
-                        # -+
-                        # +-
-                        # watercliff38
-                        template = 96
-
-            if template != 0 and template != 0xFFFF:
-                templates[i : i + 2, j : j + 2] = template
-                icons[i, j] = 0
-                icons[i, j + 1] = 1
-                icons[i + 1, j] = 2
-                icons[i + 1, j + 1] = 3
-
-    # special cases
-    for i in range(1, 4 * (M.shape[0] // 4) + 1, 4):
-        for j in range(1, 4 * (M.shape[1] // 4) + 1, 4):
+    for i in range(1, M.shape[0] - 3, 4):
+        for j in range(1, M.shape[1] - 3, 4):
             target_slice = (slice(i, i + 4), slice(j, j + 4))
-            if generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, -1, 0],
-                        [1, 0, -1, 0, -1],
-                        [0, 1, 0, -1, 0],
-                        [-1, 0, 1, 0, 1],
-                        [0, -1, 0, -1, 0],
-                    ]
-                ),
-            ) or generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, -1, 0],
-                        [1, 0, 1, 0, -1],
-                        [0, -1, 0, 1, 0],
-                        [-1, 0, -1, 0, 1],
-                        [0, -1, 0, -1, 0],
-                    ]
-                ),
-            ):
-                # _    or __
-                #  |__      |_
+            match = bind(generate.match_pattern, map=M[i - 1 : i + 4, j - 1 : j + 4])
+            pseudo_random_seed = generate.fixed_random(i, j)
 
-                if M[i - 1, j - 1] > M[i + 1, j - 1]:
-                    if M[i + 1, j - 1] >= 0:
-                        # slope02
-                        templates[target_slice] = numpy.array(
-                            [
-                                [136, 136, 0xFFFF, 0xFFFF],
-                                [136, 136, 136, 136],
-                                [136, 136, 136, 136],
-                                [0xFFFF, 0xFFFF, 136, 136],
-                            ]
+            for patterns, templates_replace, icons_replace in tile_patterns:
+                if patterns.shape[1:] == (5, 5) and templates_replace.shape[1:] == (4, 4):
+                    if any(match(pattern) for pattern in patterns):
+                        new_templates, new_icons = generate.get_pseudo_random_choice(
+                            templates_replace, icons_replace, pseudo_random_seed
                         )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 0xFF, 0xFF], [2, 3, 0, 1], [4, 5, 2, 3], [0xFF, 0xFF, 4, 5],]
-                        )
-                    else:
-                        # shorecliff02
-                        templates[target_slice] = numpy.array(
-                            [
-                                [60, 60, 0xFFFF, 0xFFFF],
-                                [60, 60, 60, 60],
-                                [60, 60, 60, 60],
-                                [1, 1, 60, 60],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 0xFF, 0xFF], [2, 3, 0, 1], [4, 5, 2, 3], [0, 0, 4, 5],]
-                        )
-                else:
-                    if M[i - 1, j - 1] >= 0:
-                        # slope16
-                        templates[target_slice] = numpy.array(
-                            [
-                                [150, 0xFFFF, 0xFFFF, 0xFFFF],
-                                [150, 150, 150, 0xFFFF],
-                                [0xFFFF, 150, 150, 150],
-                                [0xFFFF, 0xFFFF, 0xFFFF, 150],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [
-                                [0, 0xFF, 0xFF, 0xFF],
-                                [2, 3, 0, 0xFF],
-                                [0xFF, 5, 2, 3],
-                                [0xFF, 0xFF, 0xFF, 5],
-                            ]
-                        )
-                    else:
-                        # shorecliff16
-                        templates[target_slice] = numpy.array(
-                            [
-                                [74, 1, 1, 1],
-                                [74, 74, 74, 1],
-                                [0xFFFF, 74, 74, 74],
-                                [0xFFFF, 0xFFFF, 0xFFFF, 74],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 0, 0, 0], [2, 3, 0, 0], [0xFF, 5, 2, 3], [0xFF, 0xFF, 0xFF, 5],]
-                        )
-            elif generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, -1, 0],
-                        [-1, 0, 1, 0, 1],
-                        [0, 1, 0, -1, 0],
-                        [1, 0, -1, 0, -1],
-                        [0, -1, 0, -1, 0],
-                    ]
-                ),
-            ) or generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, -1, 0],
-                        [-1, 0, -1, 0, 1],
-                        [0, -1, 0, 1, 0],
-                        [1, 0, 1, 0, -1],
-                        [0, -1, 0, -1, 0],
-                    ]
-                ),
-            ):
-                #   __ or    _
-                # _|      __|
+                        templates[target_slice] = new_templates
+                        icons[target_slice] = new_icons
+                        break
 
-                if M[i + 1, j - 1] > M[i + 3, j - 1]:
-                    if M[i + 3, j - 1] >= 0:
-                        # slope06 = 140
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 0xFFFF, 140, 140],
-                                [140, 140, 140, 140],
-                                [140, 140, 140, 0xFFFF],
-                                [140, 0xFFFF, 0xFFFF, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [
-                                [0xFF, 0xFF, 0, 1],
-                                [0, 1, 2, 3],
-                                [2, 3, 4, 0xFF],
-                                [4, 0xFF, 0xFF, 0xFF],
-                            ]
-                        )
-                    else:
-                        # shorecliff06 = 64
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 0xFFFF, 64, 64],
-                                [64, 64, 64, 64],
-                                [64, 64, 64, 1],
-                                [64, 1, 1, 1],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0xFF, 0xFF, 0, 1], [0, 1, 2, 3], [2, 3, 4, 0], [4, 0, 0, 0],]
-                        )
-                else:
-                    if M[i + 1, j - 1] >= 0:
-                        # slope20 = 154
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 0xFFFF, 0xFFFF, 154],
-                                [0xFFFF, 154, 154, 154],
-                                [154, 154, 154, 154],
-                                [154, 154, 0xFFFF, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [
-                                [0xFF, 0xFF, 0xFF, 1],
-                                [0xFF, 1, 2, 3],
-                                [2, 3, 4, 5],
-                                [4, 5, 0xFF, 0xFF],
-                            ]
-                        )
-                    else:
-                        # shorecliff20 = 78
-                        templates[target_slice] = numpy.array(
-                            [
-                                [1, 1, 1, 78],
-                                [1, 78, 78, 78],
-                                [78, 78, 78, 78],
-                                [78, 78, 0xFFFF, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 0, 0, 1], [0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 0xFF, 0xFF],]
-                        )
-            elif generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
+    for i in range(3, M.shape[0] - 5, 4):
+        for j in range(3, M.shape[1] - 5, 4):
+            target_slice = (slice(i, i + 4), slice(j, j + 4))
+            if generate.match_pattern(
                 numpy.array(
                     [
-                        [0, 1, 0, -1, 0],
-                        [-1, 0, 1, 0, -1],
-                        [0, -1, 0, 1, 0],
-                        [-1, 0, -1, 0, -1],
-                        [0, -1, 0, 1, 0],
+                        [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 1, 0, -1, 0, 0, 0],
+                        [1, 0, 1, 0, 0, 0, -1, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, -1, 0, 0, 0, -1, 0, 0],
+                        [0, 0, 0, -1, 0, -1, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
                     ]
                 ),
-            ) or generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, 1, 0, -1, 0],
-                        [-1, 0, -1, 0, -1],
-                        [0, 1, 0, -1, 0],
-                        [-1, 0, 1, 0, -1],
-                        [0, -1, 0, 1, 0],
-                    ]
-                ),
+                M[i - 3 : i + 6, j - 3 : j + 6],
             ):
-                # |_  or |
-                #   |    |_
-                #   |      |
-
-                if M[i - 1, j - 1] > M[i - 1, j + 1]:
-                    if M[i - 1, j + 1] >= 0:
-                        # slope27 = 161
-                        templates[target_slice] = numpy.array(
-                            [
-                                [161, 161, 161, 0xFFFF],
-                                [161, 161, 161, 0xFFFF],
-                                [0xFFFF, 161, 161, 161],
-                                [0xFFFF, 161, 161, 161],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 2, 0xFF], [3, 4, 5, 0xFF], [0xFF, 0, 1, 2], [0xFF, 3, 4, 5],]
-                        )
-                    else:
-                        # shorecliff27 = 85
-                        templates[target_slice] = numpy.array(
-                            [
-                                [85, 85, 85, 1],
-                                [85, 85, 85, 1],
-                                [0xFFFF, 85, 85, 85],
-                                [0xFFFF, 85, 85, 85],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 2, 0], [3, 4, 5, 0], [0xFF, 0, 1, 2], [0xFF, 3, 4, 5],]
-                        )
-                else:
-                    if M[i - 1, j - 1] >= 0:
-                        # slope09 = 143
-                        templates[target_slice] = numpy.array(
-                            [
-                                [143, 143, 143, 0xFFFF],
-                                [143, 143, 143, 0xFFFF],
-                                [0xFFFF, 143, 143, 143],
-                                [0xFFFF, 143, 143, 143],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 2, 0xFF], [3, 4, 5, 0xFF], [0xFF, 0, 1, 2], [0xFF, 3, 4, 5],]
-                        )
-                    else:
-                        # shorecliff09 = 67
-                        templates[target_slice] = numpy.array(
-                            [
-                                [67, 67, 67, 0xFFFF],
-                                [67, 67, 67, 0xFFFF],
-                                [1, 67, 67, 67],
-                                [1, 67, 67, 67],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 1, 2, 0xFF], [3, 4, 5, 0xFF], [0, 0, 1, 2], [0, 3, 4, 5],]
-                        )
-            elif generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, 1, 0],
-                        [-1, 0, 1, 0, -1],
-                        [0, 1, 0, -1, 0],
-                        [-1, 0, -1, 0, -1],
-                        [0, 1, 0, -1, 0],
-                    ]
-                ),
-            ) or generate.match_mask(
-                M[i - 1 : i + 4, j - 1 : j + 4],
-                numpy.array(
-                    [
-                        [0, -1, 0, 1, 0],
-                        [-1, 0, -1, 0, -1],
-                        [0, -1, 0, 1, 0],
-                        [-1, 0, 1, 0, -1],
-                        [0, 1, 0, -1, 0],
-                    ]
-                ),
-            ):
-                #  _| or |
-                # |     _|
-                # |    |
-                if M[i - 1, j + 1] > M[i - 1, j + 3]:
-                    if M[i - 1, j + 3] >= 0:
-                        # slope23 = 157
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 157, 157, 157],
-                                [0xFFFF, 157, 157, 157],
-                                [157, 157, 157, 0xFFFF],
-                                [157, 157, 157, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0xFF, 0, 1, 2], [0xFF, 3, 4, 5], [0, 1, 2, 0xFF], [3, 4, 5, 0xFF],]
-                        )
-                    else:
-                        # shorecliff23 = 81
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 81, 81, 81],
-                                [0xFFFF, 81, 81, 81],
-                                [81, 81, 81, 1],
-                                [81, 81, 81, 1],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0xFF, 0, 1, 2], [0xFF, 3, 4, 5], [0, 1, 2, 0], [3, 4, 5, 0],]
-                        )
-                else:
-                    if M[i - 1, j + 1] >= 0:
-                        # slope13 = 147
-                        templates[target_slice] = numpy.array(
-                            [
-                                [0xFFFF, 147, 147, 147],
-                                [0xFFFF, 147, 147, 147],
-                                [147, 147, 147, 0xFFFF],
-                                [147, 147, 147, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0xFF, 0, 1, 2], [0xFF, 3, 4, 5], [0, 1, 2, 0xFF], [3, 4, 5, 0xFF],]
-                        )
-                    else:
-                        # shorecliff13 = 71
-                        templates[target_slice] = numpy.array(
-                            [
-                                [1, 71, 71, 71],
-                                [1, 71, 71, 71],
-                                [71, 71, 71, 0xFFFF],
-                                [71, 71, 71, 0xFFFF],
-                            ]
-                        )
-                        icons[target_slice] = numpy.array(
-                            [[0, 0, 1, 2], [0, 3, 4, 5], [0, 1, 2, 0xFF], [3, 4, 5, 0xFF],]
-                        )
-
+                if M[i - 1, j - 1] >= 0 and M[i - 1, j + 1] < 0:
+                    # shore49 = 51
+                    templates[target_slice] = numpy.array(
+                        [[51, 51, 51, 1], [51, 51, 51, 1], [51, 51, 51, 1], [1, 1, 1, 1],]
+                    )
+                    icons[target_slice] = numpy.array(
+                        [[0, 1, 2, 0], [3, 4, 5, 0], [6, 7, 8, 0], [0, 0, 0, 0],]
+                    )
     return templates, icons
 
 
