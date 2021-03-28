@@ -1,7 +1,9 @@
-import brownian_sheet
-import numpy
 from zlib import crc32
 import struct
+
+import numpy
+
+import brownian_sheet
 
 
 def match_mask2(map, pattern):
@@ -22,7 +24,7 @@ def prepare_formation(pattern, template, icon=None, template_map=None):
     pattern = numpy.array(pattern)
     template = numpy.array(template)
     if template_map is not None and template.dtype.type == numpy.dtype(str):
-        template = numpy.vectorize(template_map.get)(template)
+        template = numpy.vectorize(template_map.__getitem__)(template)
 
     if pattern.ndim == 2:
         pattern == prepend_dim(pattern)
