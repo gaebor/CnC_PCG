@@ -178,7 +178,31 @@ def make_threshold_mask(th, X):
     return th
 
 
-def main(args, render_f):
+def render_tiles(M, templates, icons, tile_patterns):
+    for pattern_size in [2, 4]:
+        for i in range(1, M.shape[0] - (pattern_size - 1), pattern_size):
+            for j in range(1, M.shape[1] - (pattern_size - 1), pattern_size):
+                target_slice = (slice(i, i + pattern_size), slice(j, j + pattern_size))
+                roi = M[i - 1 : i + pattern_size, j - 1 : j + pattern_size]
+                pseudo_random_seed = fixed_random(i, j)
+
+                for patterns, templates_replace, icons_replace in tile_patterns:
+                    if patterns.shape[1:] == (
+                        pattern_size + 1,
+                        pattern_size + 1,
+                    ) and templates_replace.shape[1:] == (pattern_size, pattern_size):
+                        if any(match_pattern(pattern, roi) for pattern in patterns):
+                            new_templates, new_icons = get_pseudo_random_choice(
+                                templates_replace, icons_replace, pseudo_random_seed
+                            )
+                            templates[target_slice] = new_templates
+                            icons[target_slice] = new_icons
+                            break
+
+    return templates, icons
+
+
+def main(args, templates, icons, tile_patterns):
     if args.seed < 0:
         args.seed = crc32(struct.pack('d', time.time()))
     print(args.seed, file=sys.stderr)
@@ -205,7 +229,7 @@ def main(args, render_f):
         args.dh = int(args.dh[0])
 
     M = brownian_sheet.generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
-    templates, icons = render_f(M)
+    render_tiles(M, templates, icons, tile_patterns)
 
     # free cells
     Fmask = numpy.zeros(templates.shape, dtype=bool)

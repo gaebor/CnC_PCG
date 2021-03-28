@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 from argparse import ArgumentParser
 import sys
-from functools import partial as bind
 
 import numpy
 
-from brownian_sheet import *
 from lcw import base64write, LCWpack, MyFormatter
 import generate
 
@@ -50,77 +48,11 @@ def mapwrite(templates, icons, mines=[], trees=[], f=sys.stdout, width=126, heig
 tile_patterns = generate.import_tiles_file('ra1_tiles.json')
 
 
-def to_tiles(M):
-    """
-    calculates RA1 template and icon enums from edge and cell data
-    """
-    templates = numpy.ones((128, 128), dtype=numpy.uint16) * 0xFFFF
-    icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
-
-    for i in range(1, M.shape[0] - 1, 2):
-        for j in range(1, M.shape[1] - 1, 2):
-            target_slice = (slice(i, i + 2), slice(j, j + 2))
-            match = bind(generate.match_pattern, map=M[i - 1 : i + 2, j - 1 : j + 2])
-            pseudo_random_seed = generate.fixed_random(i, j)
-
-            for patterns, templates_replace, icons_replace in tile_patterns:
-                if patterns.shape[1:] == (3, 3) and templates_replace.shape[1:] == (2, 2):
-                    if any(match(pattern) for pattern in patterns):
-                        new_templates, new_icons = generate.get_pseudo_random_choice(
-                            templates_replace, icons_replace, pseudo_random_seed
-                        )
-                        templates[target_slice] = new_templates
-                        icons[target_slice] = new_icons
-                        break
-
-    for i in range(1, M.shape[0] - 3, 4):
-        for j in range(1, M.shape[1] - 3, 4):
-            target_slice = (slice(i, i + 4), slice(j, j + 4))
-            match = bind(generate.match_pattern, map=M[i - 1 : i + 4, j - 1 : j + 4])
-            pseudo_random_seed = generate.fixed_random(i, j)
-
-            for patterns, templates_replace, icons_replace in tile_patterns:
-                if patterns.shape[1:] == (5, 5) and templates_replace.shape[1:] == (4, 4):
-                    if any(match(pattern) for pattern in patterns):
-                        new_templates, new_icons = generate.get_pseudo_random_choice(
-                            templates_replace, icons_replace, pseudo_random_seed
-                        )
-                        templates[target_slice] = new_templates
-                        icons[target_slice] = new_icons
-                        break
-
-    for i in range(3, M.shape[0] - 5, 4):
-        for j in range(3, M.shape[1] - 5, 4):
-            target_slice = (slice(i, i + 4), slice(j, j + 4))
-            if generate.match_pattern(
-                numpy.array(
-                    [
-                        [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 1, 0, -1, 0, 0, 0],
-                        [1, 0, 1, 0, 0, 0, -1, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, -1, 0, 0, 0, -1, 0, 0],
-                        [0, 0, 0, -1, 0, -1, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                    ]
-                ),
-                M[i - 3 : i + 6, j - 3 : j + 6],
-            ):
-                if M[i - 1, j - 1] >= 0 and M[i - 1, j + 1] < 0:
-                    # shore49 = 51
-                    templates[target_slice] = numpy.array(
-                        [[51, 51, 51, 1], [51, 51, 51, 1], [51, 51, 51, 1], [1, 1, 1, 1],]
-                    )
-                    icons[target_slice] = numpy.array(
-                        [[0, 1, 2, 0], [3, 4, 5, 0], [6, 7, 8, 0], [0, 0, 0, 0],]
-                    )
-    return templates, icons
-
-
 def main(args):
-    values = generate.main(args, to_tiles)
+    empty_templates = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFFFF
+    empty_icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
+
+    values = generate.main(args, empty_templates, empty_icons, tile_patterns)
     M = values[0]
     values = values[1:]
     if args.output == '':
