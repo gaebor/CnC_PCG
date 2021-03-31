@@ -49,12 +49,36 @@ tile_patterns = generate.import_tiles_file('ra1_tiles.json')
 
 
 def main(args):
-    empty_templates = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFFFF
-    empty_icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
+    if args.seed < 0:
+        args.seed = generate.fixed_random()
+    print("random seed:", args.seed, file=sys.stderr)
+    numpy.random.seed(args.seed)
 
-    values = generate.main(args, empty_templates, empty_icons, tile_patterns)
-    M = values[0]
-    values = values[1:]
+    M = generate.random_height_map(
+        args.n,
+        args.rockface,
+        args.dhbase,
+        args.dh,
+        noise_type=args.type,
+        H=args.H,
+        offset=args.offset,
+    )
+
+    templates = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFFFF
+    icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
+
+    for level in tile_patterns:
+        generate.render_tiles(M, templates, icons, level)
+
+    resource_positions, tree_positions = generate.scatter_overlays(
+        templates,
+        args.n * 2 - 2,
+        resource_params=args.resource,
+        tree_params=args.tree,
+        noise_type=args.type,
+        H=args.H,
+    )
+
     if args.output == '':
         outf = sys.stdout
     else:
@@ -63,7 +87,15 @@ def main(args):
     if args.format == 'html':
         print(generate.html(M, width=args.width, hue=args.hue), file=outf)
     elif args.format == 'mpr':
-        mapwrite(*values, width=M.shape[1] - 1, height=M.shape[0] - 1, f=outf)
+        mapwrite(
+            templates,
+            icons,
+            resource_positions,
+            tree_positions,
+            width=M.shape[1] - 1,
+            height=M.shape[0] - 1,
+            f=outf,
+        )
     return 0
 
 
