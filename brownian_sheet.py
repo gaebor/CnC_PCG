@@ -16,10 +16,6 @@ import zlib
 """
 
 
-def sigmoid(x):
-    return 1 / (1 + numpy.exp(-x))
-
-
 def perlin(shape0, shape1, **kwargs):
     n = 2 ** math.ceil(numpy.log2(max(shape0, shape1)))
     octaves = 1 + int(numpy.log2(n))

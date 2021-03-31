@@ -2,7 +2,6 @@ from zlib import crc32
 import struct
 import json
 import time
-import sys
 
 import numpy
 
@@ -34,8 +33,8 @@ def import_tiles_file(filename):
             template_map = None
 
         return [
-            prepare_formation(template_map=template_map, **pattern)
-            for pattern in tiles_spec['patterns']
+            [prepare_formation(template_map=template_map, **pattern) for pattern in level]
+            for level in tiles_spec['patterns']
         ]
 
 
@@ -72,11 +71,13 @@ def get_pseudo_random_choice(templates, icons, pseudo_random_seed=0):
     return templates[i], icons[i]
 
 
-def fixed_random(x, y=None):
-    if y is not None:
-        return crc32(struct.pack('BB', x, y))
-    else:
+def fixed_random(x=None, y=None):
+    if x is None:
+        return crc32(struct.pack('d', time.time()))
+    if y is None:
         return crc32(struct.pack('H', x))
+
+    return crc32(struct.pack('BB', x, y))
 
 
 def by_color(F, G, H, width=20):
@@ -162,66 +163,63 @@ def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
     return result
 
 
+def sigmoid(x):
+    return 1 / (1 + numpy.exp(-x))
+
+
 def make_threshold_mask(th, X):
     if len(th) == 1:
         th = th[0]
     else:
-        th = brownian_sheet.sigmoid(th[0] * X + th[1])
+        th = sigmoid(th[0] * X + th[1])
     return th
 
 
 def render_tiles(M, templates, icons, tile_patterns):
-    for pattern_size in [2, 4]:
-        for i in range(1, M.shape[0] - (pattern_size - 1), pattern_size):
-            for j in range(1, M.shape[1] - (pattern_size - 1), pattern_size):
-                target_slice = (slice(i, i + pattern_size), slice(j, j + pattern_size))
-                roi = M[i - 1 : i + pattern_size, j - 1 : j + pattern_size]
-                pseudo_random_seed = fixed_random(i, j)
+    pattern_size = numpy.array(tile_patterns[0][0].shape[1:])
+    tile_size = numpy.array(tile_patterns[0][1].shape[1:])
+    offset = (pattern_size - tile_size - 1) // 2
 
-                for patterns, templates_replace, icons_replace in tile_patterns:
-                    if patterns.shape[1:] == (
-                        pattern_size + 1,
-                        pattern_size + 1,
-                    ) and templates_replace.shape[1:] == (pattern_size, pattern_size):
-                        if any(match_pattern(pattern, roi) for pattern in patterns):
-                            new_templates, new_icons = get_pseudo_random_choice(
-                                templates_replace, icons_replace, pseudo_random_seed
-                            )
-                            templates[target_slice] = new_templates
-                            icons[target_slice] = new_icons
-                            break
+    for i in range(1 + offset[0], M.shape[0] - (tile_size[0] - 1) - offset[0], tile_size[0]):
+        for j in range(1 + offset[1], M.shape[1] - (tile_size[1] - 1) - offset[1], tile_size[1]):
+            target_slice = (slice(i, i + tile_size[0]), slice(j, j + tile_size[1]))
+            roi = M[
+                i - 1 - offset[0] : i + tile_size[0] + offset[0],
+                j - 1 - offset[1] : j + tile_size[1] + offset[1],
+            ]
+            pseudo_random_seed = fixed_random(i, j)
+
+            for patterns, templates_replace, icons_replace in tile_patterns:
+                if any(match_pattern(pattern, roi) for pattern in patterns):
+                    new_templates, new_icons = get_pseudo_random_choice(
+                        templates_replace, icons_replace, pseudo_random_seed
+                    )
+                    templates[target_slice] = new_templates
+                    icons[target_slice] = new_icons
+                    break
 
     return templates, icons
 
 
-def main(args, templates, icons, tile_patterns):
-    if args.seed < 0:
-        args.seed = crc32(struct.pack('d', time.time()))
-    print(args.seed, file=sys.stderr)
+def random_height_map(n, rockface, dhbase, dh, noise_type='brownian', H=0.5, offset=0):
+    generator = getattr(brownian_sheet, noise_type)
+    B, _ = generator(n, n, H=H)
+    B += offset
 
-    numpy.random.seed(args.seed)
+    R, dH = generator(n, n, H=H)
 
-    final_size = args.n * 2 - 2
+    rockface_threshold = make_threshold_mask(rockface, R)
+    dh_threshold = make_threshold_mask(dh, dH)
 
-    generator = getattr(brownian_sheet, args.type)
+    return brownian_sheet.generate_map(B, dh=dh_threshold, dhbase=dhbase, dx=rockface_threshold)
 
-    B, X = generator(args.n, args.n, H=args.H)
-    R1, R2 = generator(final_size, final_size, H=args.H)
 
-    B += args.offset
-
-    args.rockface = make_threshold_mask(args.rockface, X)
-    args.resource = make_threshold_mask(args.resource, R1)
-    args.tree = make_threshold_mask(args.tree, R2)
-
-    if len(args.dh) > 1:
-        H, _ = generator(args.n, args.n, H=args.H)
-        args.dh = (32 * make_threshold_mask(args.dh, H)).astype('int32')
-    else:
-        args.dh = int(args.dh[0])
-
-    M = brownian_sheet.generate_map(B, dh=args.dh, dhbase=args.dhbase, dx=args.rockface)
-    render_tiles(M, templates, icons, tile_patterns)
+def scatter_overlays(
+    templates, final_size, resource_params, tree_params, noise_type='brownian', H=0.5
+):
+    R1, R2 = getattr(brownian_sheet, noise_type)(final_size, final_size, H=H)
+    resource_threshold = make_threshold_mask(resource_params, R1)
+    tree_threshold = make_threshold_mask(tree_params, R2)
 
     # free cells
     Fmask = numpy.zeros(templates.shape, dtype=bool)
@@ -231,13 +229,13 @@ def main(args, templates, icons, tile_patterns):
 
     Rmask = numpy.zeros(templates.shape, dtype=bool)
     Rmask[1 : 1 + final_size, 1 : 1 + final_size] = numpy.logical_and(
-        numpy.random.rand(final_size, final_size) < args.resource,
+        numpy.random.rand(final_size, final_size) < resource_threshold,
         Fmask[1 : 1 + final_size, 1 : 1 + final_size],
     )
     resource_positions = numpy.where(Rmask.flatten())[0]
 
     Rmask[1 : 1 + final_size, 1 : 1 + final_size] = numpy.logical_and(
-        numpy.random.rand(final_size, final_size) < args.tree,
+        numpy.random.rand(final_size, final_size) < tree_threshold,
         numpy.logical_and(
             Fmask[1 : 1 + final_size, 1 : 1 + final_size],
             ~Rmask[1 : 1 + final_size, 1 : 1 + final_size],
@@ -245,4 +243,4 @@ def main(args, templates, icons, tile_patterns):
     )
     tree_positions = numpy.where(Rmask.flatten())[0]
 
-    return M, templates, icons, resource_positions, tree_positions
+    return resource_positions, tree_positions
