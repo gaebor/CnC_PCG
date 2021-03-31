@@ -143,9 +143,13 @@ def html(E, width=20, hue=4):
             if i < h - 1:
                 if E[2 * i + 1, 2 * j] > 0:
                     sides.append(('bottom', "2px solid brown"))
+                elif E[2 * i + 1, 2 * j] < 0:
+                    sides.append(('bottom', "1px dotted brown"))
             if j < w - 1:
                 if E[2 * i, 2 * j + 1] > 0:
                     sides.append(('right', "2px solid brown"))
+                elif E[2 * i, 2 * j + 1] < 0:
+                    sides.append(('right', "1px dotted brown"))
             result.append(rendertile(i, j, color, sides))
         result.append("  </tr>")
     result.append("</table>")

@@ -165,21 +165,27 @@ bad:
 
 
 def threshold_contours(E, dx):
-    # must erase marked contours on land and their neighboring edges
-    # TODO: may erase marked contours on beach
+    height = E[::2, ::2]
+    # where to delete rockface
+    pattern = numpy.random.rand(*height.shape) < dx
 
-    pattern = numpy.random.rand((E.shape[0] + 1) // 2, (E.shape[1] + 1) // 2) < dx
-    pattern[E[::2, ::2] < 0] = False
-    (pattern[:, 1:])[E[::2, :-1:2] < 0] = False
-    (pattern[:, :-1])[E[::2, 2::2] < 0] = False
-    (pattern[1:, :])[E[:-1:2, ::2] < 0] = False
-    (pattern[:-1, :])[E[2::2, ::2] < 0] = False
+    # delete the 4 neighbouring edges of the targeted tilefaces, but only if not next to water
+    E[1::2, ::2][
+        (pattern[1:, :] | pattern[:-1, :]) & (height[1:, :] >= 0) & (height[:-1, :] >= 0)
+    ] = 0
+    E[::2, 1::2][
+        (pattern[:, 1:] | pattern[:, :-1]) & (height[:, 1:] >= 0) & (height[:, :-1] >= 0)
+    ] = 0
 
-    E[1::2, ::2][pattern[1:, :]] = 0
-    E[1::2, ::2][pattern[:-1, :]] = 0
+    # the edges that are marked for deletion and fall next to water
+    # should be marked with -1, not 0
+    E[1::2, ::2][
+        (pattern[1:, :] | pattern[:-1, :]) & ((height[1:, :] < 0) | (height[:-1, :] < 0))
+    ] *= -1
+    E[::2, 1::2][
+        (pattern[:, 1:] | pattern[:, :-1]) & ((height[:, 1:] < 0) | (height[:, :-1] < 0))
+    ] *= -1
 
-    E[::2, 1::2][pattern[:, 1:]] = 0
-    E[::2, 1::2][pattern[:, :-1]] = 0
     return E
 
 
