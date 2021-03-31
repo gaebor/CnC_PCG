@@ -52,7 +52,7 @@ def brownian(n, m, H=0.5):
         c0 = beta * (R - 1) ** 3 + 1 - c2
 
     def rho(r):
-        out = beta * (R - r) ** 3 / r
+        out = beta * (R - r) ** 3 / numpy.maximum(r, 1)
         out[r <= 1] = 0
         out += (r <= 1) * (c0 - r ** alpha + c2 * r ** 2)
         out[r > R] = 0
@@ -80,10 +80,14 @@ def brownian(n, m, H=0.5):
 
 def highest_bit(x, dtype='int32'):
     # TODO ufunc
-    y = (numpy.log2(x) + 1).astype(dtype)
+    y = (numpy.log2(numpy.maximum(x, 1)) + 1).astype(dtype)
     y[x == 0] = 0
     y[x < 0] = numpy.dtype(dtype).itemsize * 8
     return y
+
+
+def contour_hierarchy(a, b):
+    return highest_bit(a ^ b, dtype=a.dtype)
 
 
 def find_contours(F, dhbase=0.125):
@@ -106,8 +110,8 @@ def find_contours(F, dhbase=0.125):
     E = numpy.zeros((2 * F.shape[0] - 1, 2 * F.shape[1] - 1), 'int32')
     E[::2, ::2] = numpy.maximum(-1, numpy.floor(F / dhbase).astype('int32'))
 
-    E[1::2, ::2] = highest_bit(E[2::2, ::2] ^ E[:-2:2, ::2])
-    E[::2, 1::2] = highest_bit(E[::2, 2::2] ^ E[::2, :-2:2])
+    E[1::2, ::2] = contour_hierarchy(E[2::2, ::2], E[:-2:2, ::2])
+    E[::2, 1::2] = contour_hierarchy(E[::2, 2::2], E[::2, :-2:2])
 
     return E
 
