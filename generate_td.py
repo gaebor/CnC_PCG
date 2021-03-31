@@ -8,7 +8,7 @@ from lcw import MyFormatter
 import generate
 
 
-def mapwrite(templates, icons, tibtrees=[], trees=[], filename='map', width=62, height=62):
+def mapwrite(templates, icons, tibtrees=(), trees=(), filename='map', width=62, height=62):
     assert templates.shape == icons.shape
     assert templates.shape == (64, 64)
 

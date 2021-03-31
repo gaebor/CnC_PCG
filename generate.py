@@ -8,14 +8,14 @@ import numpy
 import brownian_sheet
 
 
-def match_pattern(pattern, map):
+def match_pattern(pattern, roi):
     return (
-        (map[pattern == 0] == 0).all()  # 0: should be 0
-        and (map[pattern == 1] != 0).all()  # 1: must containg something
-        and (map[(pattern >= 2) & (pattern <= 4)] >= 0).all()
+        (roi[pattern == 0] == 0).all()  # 0: should be 0
+        and (roi[pattern == 1] != 0).all()  # 1: must containg something
+        and (roi[(pattern >= 2) & (pattern <= 4)] >= 0).all()
         # 2, 3 or 4: land (i.e. 0 or positive)
-        and (map[pattern < 0] < 0).all()  # negative: water
-        and (map[pattern == 3] < map[pattern == 4]).all()  # 3 should be lower than 4
+        and (roi[pattern < 0] < 0).all()  # negative: water
+        and (roi[pattern == 3] < roi[pattern == 4]).all()  # 3 should be lower than 4
     )
 
 
@@ -93,7 +93,8 @@ def by_color(F, G, H, width=20):
     result.append("</head>")
     result.append("<body>")
     result.append(
-        "<table border=0 cellpadding=0 cellspacing=0 style='border-collapse: collapse; table-layout:fixed;'>"
+        "<table border=0 cellpadding=0 cellspacing=0 "
+        "style='border-collapse: collapse; table-layout:fixed;'>"
     )
 
     result.append("  <col width={0} style='width={0}px;' span={1}>".format(width, F.shape[1]))
@@ -101,7 +102,7 @@ def by_color(F, G, H, width=20):
         result.append("  <tr>")
         for j in range(F.shape[1]):
             color = "rgb({},{},{})".format(F[i, j], G[i, j], H[i, j])
-            result.append(rendertile(i, j, color, width=width))
+            result.append(rendertile(i, j, color))
         result.append("  </tr>")
     result.append("</table>")
     result.append("</body>")
@@ -122,7 +123,8 @@ def html(E, width=20, hue=4):
     result.append("</head>")
     result.append("<body>")
     result.append(
-        "<table border=0 cellpadding=0 cellspacing=0 style='border-collapse: collapse; table-layout:fixed;'>"
+        "<table border=0 cellpadding=0 cellspacing=0 "
+        "style='border-collapse: collapse; table-layout:fixed;'>"
     )
 
     h = (E.shape[0] + 1) // 2
@@ -144,7 +146,7 @@ def html(E, width=20, hue=4):
             if j < w - 1:
                 if E[2 * i, 2 * j + 1] > 0:
                     sides.append(('right', "2px solid brown"))
-            result.append(rendertile(i, j, color, sides, width))
+            result.append(rendertile(i, j, color, sides))
         result.append("  </tr>")
     result.append("</table>")
     result.append("</body>")
@@ -152,10 +154,10 @@ def html(E, width=20, hue=4):
     return '\n'.join(result)
 
 
-def rendertile(i, j, color, l=[], width=20, thinstroke=1, thickstroke=2):
+def rendertile(i, j, color, l=()):
     result = "<td style='background-color:{}; ".format(color)
     for s in l:
-        if type(s) == str:
+        if isinstance(s, str):
             result += "border-{}: {};".format(s, "1px solid black")
         elif len(s) > 1:
             result += "border-{}: {};".format(*s)

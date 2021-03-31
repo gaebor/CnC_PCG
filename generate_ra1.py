@@ -8,7 +8,7 @@ from lcw import base64write, LCWpack, MyFormatter
 import generate
 
 
-def mapwrite(templates, icons, mines=[], trees=[], f=sys.stdout, width=126, height=126):
+def mapwrite(templates, icons, mines=(), trees=(), f=sys.stdout, width=126, height=126):
     assert templates.shape == icons.shape
     assert templates.shape == (128, 128)
     print("[Basic]", file=f)
