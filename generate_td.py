@@ -71,19 +71,17 @@ def main(args):
         H=args.H,
     )
 
+    output_filename = f'{args.output}.seed{args.seed}'
     if args.format == 'html':
-        if args.output == '':
-            outf = sys.stdout
-        else:
-            outf = open(args.output + '.html', "w")
-        print(generate.html(M, width=args.width, hue=args.hue), file=outf)
+        with open(f'{output_filename}.html', 'wt') as outf:
+            print(generate.html(M, width=args.width, hue=args.hue), file=outf)
     elif args.format == 'inibin':
         mapwrite(
             templates,
             icons,
             resource_positions,
             tree_positions,
-            filename=args.output,
+            filename=output_filename,
             width=M.shape[1] - 1,
             height=M.shape[0] - 1,
         )

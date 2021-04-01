@@ -79,23 +79,19 @@ def main(args):
         H=args.H,
     )
 
-    if args.output == '':
-        outf = sys.stdout
-    else:
-        outf = open(args.output + '.' + args.format, "w")
-
-    if args.format == 'html':
-        print(generate.html(M, width=args.width, hue=args.hue), file=outf)
-    elif args.format == 'mpr':
-        mapwrite(
-            templates,
-            icons,
-            resource_positions,
-            tree_positions,
-            width=M.shape[1] - 1,
-            height=M.shape[0] - 1,
-            f=outf,
-        )
+    with open(f'{args.output}.seed{args.seed}.{args.format}', 'wt') as outf:
+        if args.format == 'html':
+            print(generate.html(M, width=args.width, hue=args.hue), file=outf)
+        elif args.format == 'mpr':
+            mapwrite(
+                templates,
+                icons,
+                resource_positions,
+                tree_positions,
+                width=M.shape[1] - 1,
+                height=M.shape[0] - 1,
+                f=outf,
+            )
     return 0
 
 
