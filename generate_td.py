@@ -43,7 +43,6 @@ tile_patterns = generate.import_tiles_file('td_tiles.json')
 def main(args):
     if args.seed < 0:
         args.seed = generate.fixed_random()
-    print("random seed:", args.seed, file=sys.stderr)
     numpy.random.seed(args.seed)
 
     M = generate.random_height_map(
