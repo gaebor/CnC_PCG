@@ -40,19 +40,33 @@ def mapwrite(templates, icons, tibtrees=(), trees=(), filename='map', width=62, 
 tile_patterns = generate.import_tiles_file('td_tiles.json')
 
 
+def modify_shore(height_map):
+    land_in_rows = (height_map >= 0).any(axis=1)
+    if land_in_rows.any():
+        north_most = numpy.where(land_in_rows)[0].min()
+    else:
+        # empty map
+        return
+
+    for column_idx in range(height_map.shape[1]):
+        column = height_map[:, column_idx]
+        land_column = column >= 0
+        if land_column.any():
+            south_most = numpy.where(land_column)[0].max()
+            column[north_most:south_most] = numpy.abs(column[north_most:south_most])
+        else:
+            column[north_most] = max(column[north_most], 0)
+
+
 def main(args):
     if args.seed < 0:
         args.seed = generate.fixed_random()
     numpy.random.seed(args.seed)
 
-    M = generate.random_map(
-        args.n,
-        args.rockface,
-        args.dhbase,
-        args.dh,
-        noise_type=args.type,
-        H=args.H,
-        offset=args.offset,
+    height_map = generate.random_height_map(args.n, args.type, args.H, args.offset)
+
+    M = generate.rock_formations(
+        height_map, args.rockface, args.dhbase, args.dh, args.type, args.H
     )
 
     templates = numpy.ones((64, 64), dtype=numpy.uint8) * 0xFF
