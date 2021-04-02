@@ -211,17 +211,25 @@ def render_tiles(M, templates, icons, tile_patterns):
     return templates, icons
 
 
-def random_height_map(n, rockface, dhbase, dh, noise_type='brownian', H=0.5, offset=0):
+def random_height_map(n, noise_type='brownian', H=0.5, offset=0):
     generator = getattr(brownian_sheet, noise_type)
-    B, _ = generator(n, n, H=H)
-    B += offset
+    return generator(n, n, H=H)[0] + offset
 
-    rock_seed, dh_seed = generator(n, n, H=H)
 
+def rock_formations(height_map, rockface, dhbase, dh, noise_type='brownian', H=0.5):
+    generator = getattr(brownian_sheet, noise_type)
+    rock_seed, dh_seed = generator(*height_map.shape, H=H)
     rockface_threshold = make_threshold_mask(rockface, rock_seed)
     dh_threshold = make_threshold_mask(dh, dh_seed)
 
-    return brownian_sheet.generate_map(B, dh=dh_threshold, dhbase=dhbase, dx=rockface_threshold)
+    return brownian_sheet.generate_map(
+        height_map, dh=dh_threshold, dhbase=dhbase, dx=rockface_threshold
+    )
+
+
+def random_map(n, rockface, dhbase, dh, noise_type='brownian', H=0.5, offset=0):
+    height_map = random_height_map(n, noise_type=noise_type, H=H, offset=offset)
+    return rock_formations(height_map, rockface, dhbase, dh, noise_type=noise_type, H=H)
 
 
 def scatter_overlays(

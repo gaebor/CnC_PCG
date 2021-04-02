@@ -45,7 +45,7 @@ def main(args):
         args.seed = generate.fixed_random()
     numpy.random.seed(args.seed)
 
-    M = generate.random_height_map(
+    M = generate.random_map(
         args.n,
         args.rockface,
         args.dhbase,
