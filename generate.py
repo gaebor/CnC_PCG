@@ -10,11 +10,11 @@ import brownian_sheet
 
 def match_pattern(pattern, roi):
     return (
-        (roi[pattern == 0] == 0).all()  # 0: should be 0
-        and (roi[pattern == 1] != 0).all()  # 1: must containg something
+        (roi[pattern == 0] == 0).all()
+        and (roi[pattern == 1] > 0).all()
         and (roi[(pattern >= 2) & (pattern <= 4)] >= 0).all()
         # 2, 3 or 4: land (i.e. 0 or positive)
-        and (roi[pattern < 0] < 0).all()  # negative: water
+        and (roi[pattern < 0] < 0).all()
         and (roi[pattern == 3] < roi[pattern == 4]).all()  # 3 should be lower than 4
     )
 
@@ -189,6 +189,10 @@ def render_tiles(M, templates, icons, tile_patterns):
     for i in range(1 + offset[0], M.shape[0] - (tile_size[0] - 1) - offset[0], tile_size[0]):
         for j in range(1 + offset[1], M.shape[1] - (tile_size[1] - 1) - offset[1], tile_size[1]):
             target_slice = (slice(i, i + tile_size[0]), slice(j, j + tile_size[1]))
+
+            if (icons[target_slice] < 255).any():
+                continue
+
             roi = M[
                 i - 1 - offset[0] : i + tile_size[0] + offset[0],
                 j - 1 - offset[1] : j + tile_size[1] + offset[1],
@@ -212,10 +216,10 @@ def random_height_map(n, rockface, dhbase, dh, noise_type='brownian', H=0.5, off
     B, _ = generator(n, n, H=H)
     B += offset
 
-    R, dH = generator(n, n, H=H)
+    rock_seed, dh_seed = generator(n, n, H=H)
 
-    rockface_threshold = make_threshold_mask(rockface, R)
-    dh_threshold = make_threshold_mask(dh, dH)
+    rockface_threshold = make_threshold_mask(rockface, rock_seed)
+    dh_threshold = make_threshold_mask(dh, dh_seed)
 
     return brownian_sheet.generate_map(B, dh=dh_threshold, dhbase=dhbase, dx=rockface_threshold)
 

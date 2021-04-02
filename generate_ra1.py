@@ -48,6 +48,36 @@ def mapwrite(templates, icons, mines=(), trees=(), f=sys.stdout, width=126, heig
 tile_patterns = generate.import_tiles_file('ra1_tiles.json')
 
 
+def force_negative(A, mask):
+    A[mask] = -numpy.abs(A[mask])
+
+
+def coerce_shape(A, shape):
+    padding = [max(0, shape[d] - A.shape[d]) for d in range(A.ndim)]
+    return numpy.pad(A, padding)[tuple(slice(0, shape[d]) for d in range(A.ndim))]
+
+
+def mark_shores_retoractively(M, icons):
+    already_done = coerce_shape(
+        numpy.kron(
+            (
+                numpy.stack(
+                    [icons[5 + i : -3 : 4, 5 + j : -3 : 4] for i in range(4) for j in range(4)],
+                    axis=2,
+                )
+                < 255
+            ).any(axis=2),
+            numpy.ones((2, 2), dtype=bool),
+        ),
+        (numpy.array(M.shape) - 7) // 2,
+    )
+
+    force_negative(M[4:-4:2, 5:-3:2], already_done)
+    force_negative(M[5:-3:2, 4:-4:2], already_done)
+    force_negative(M[6:-2:2, 5:-3:2], already_done)
+    force_negative(M[5:-3:2, 6:-2:2], already_done)
+
+
 def main(args):
     if args.seed < 0:
         args.seed = generate.fixed_random()
@@ -66,7 +96,9 @@ def main(args):
     templates = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFFFF
     icons = numpy.ones((128, 128), dtype=numpy.uint8) * 0xFF
 
-    for level in tile_patterns:
+    generate.render_tiles(M, templates, icons, tile_patterns[0])
+    mark_shores_retoractively(M, icons)
+    for level in tile_patterns[1:]:
         generate.render_tiles(M, templates, icons, level)
 
     resource_positions, tree_positions = generate.scatter_overlays(

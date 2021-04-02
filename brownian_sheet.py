@@ -169,22 +169,15 @@ def threshold_contours(E, dx):
     # where to delete rockface
     pattern = numpy.random.rand(*height.shape) < dx
 
-    # delete the 4 neighbouring edges of the targeted tilefaces, but only if not next to water
+    # delete the 4 neighbouring edges of the targeted tilefaces
+    # but don't delete anz watercliff
+    # Therefore, delete only if not next to water
     E[1::2, ::2][
         (pattern[1:, :] | pattern[:-1, :]) & (height[1:, :] >= 0) & (height[:-1, :] >= 0)
     ] = 0
     E[::2, 1::2][
         (pattern[:, 1:] | pattern[:, :-1]) & (height[:, 1:] >= 0) & (height[:, :-1] >= 0)
     ] = 0
-
-    # the edges that are marked for deletion and fall next to water
-    # should be marked with -1, not 0
-    E[1::2, ::2][
-        (pattern[1:, :] | pattern[:-1, :]) & ((height[1:, :] < 0) | (height[:-1, :] < 0))
-    ] *= -1
-    E[::2, 1::2][
-        (pattern[:, 1:] | pattern[:, :-1]) & ((height[:, 1:] < 0) | (height[:, :-1] < 0))
-    ] *= -1
 
     return E
 
