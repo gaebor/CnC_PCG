@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from argparse import ArgumentParser
 import sys
+from os.path import basename
 
 import numpy
 
@@ -16,7 +17,7 @@ def mapwrite(templates, icons, tibtrees=(), trees=(), filename='map', width=62, 
         print(
             f"""[Basic]
 BuildLevel=99
-Name=CnC_PCG
+Name={basename(filename)}
 CarryOverCap=-1
 CarryOverMoney=100
 Theme=No Theme
@@ -25,7 +26,7 @@ Player=Multi1
 Action=x
 Lose=x
 Win=x
-Brief=x
+Brief={" ".join(sys.argv)}
 Author={__file__}
 SoloMission=False
 """,
@@ -35,8 +36,6 @@ SoloMission=False
         print("[Map]", file=f)
         print("X={}\nY={}\nWidth={}\nHeight={}".format(1, 1, width, height), file=f)
         print("Theater=temperate\n", file=f)
-
-        print(f'[Briefing]\nText={" ".join(sys.argv)}\n', file=f)
 
         print("[Waypoints]", file=f)
         for w in range(6):
