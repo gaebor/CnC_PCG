@@ -13,16 +13,58 @@ def mapwrite(templates, icons, tibtrees=(), trees=(), filename='map', width=62, 
     assert templates.shape == (64, 64)
 
     with open(filename + '.ini', 'w') as f:
+        print(
+            f"""[Basic]
+BuildLevel=99
+Name=CnC_PCG
+CarryOverCap=-1
+CarryOverMoney=100
+Theme=No Theme
+Percent=100
+Player=Multi1
+Action=x
+Lose=x
+Win=x
+Brief=x
+Author={__file__}
+SoloMission=False
+""",
+            file=f,
+        )
+
         print("[Map]", file=f)
         print("X={}\nY={}\nWidth={}\nHeight={}".format(1, 1, width, height), file=f)
-        print("Theater=temperate", file=f)
+        print("Theater=temperate\n", file=f)
 
-        print("", file=f)
+        print(f'[Briefing]\nText={" ".join(sys.argv)}\n', file=f)
+
         print("[Waypoints]", file=f)
         for w in range(6):
             print("{}={}".format(w, w + 65), file=f)
-
         print("", file=f)
+        for player in [
+            'Neutral',
+            'Special',
+            'Multi1',
+            'Multi2',
+            'Multi3',
+            'Multi4',
+            'Multi5',
+            'Multi6',
+        ]:
+            print(
+                """[{0}]
+Allies={0}
+MaxBuilding=150
+MaxUnit=150
+Edge=North
+Credits=0
+""".format(
+                    player
+                ),
+                file=f,
+            )
+
         print("[Terrain]", file=f)
         for p in tibtrees:
             print("{}=split2,None".format(p - 64), file=f)
@@ -84,7 +126,7 @@ def main(args):
         H=args.H,
     )
 
-    output_filename = f'{args.output}.seed{args.seed}'
+    output_filename = f'{args.output}_seed{args.seed}'
     if args.format == 'html':
         with open(f'{output_filename}.html', 'wt') as outf:
             print(generate.html(M, width=args.width, hue=args.hue), file=outf)
